@@ -5,6 +5,9 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.Signature;
 	
 public class SecureFSImplementation extends UnicastRemoteObject implements SecureFSInterface {
 	
@@ -24,21 +27,23 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
     }
 
 	@Override
-	public byte[] FS_init() throws RemoteException {
+	public byte[] get(byte[] id) throws RemoteException {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
-	public boolean FS_write(int pos, int size, byte[] contents) throws RemoteException {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	@Override
-	public Integer FS_read(byte[] id, int pos, int size, byte[] contents) throws RemoteException {
+	public byte[] put_k(byte[] data, Signature sig, PublicKey pubKey) throws RemoteException {
 		// TODO Auto-generated method stub
 		return null;
 	}
+
+	@Override
+	public byte[] put_h(byte[] data) throws RemoteException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+
 
 }

@@ -4,6 +4,7 @@ import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.security.*;
 import java.util.Scanner;
 
 import Server.SecureFSInterface;
@@ -13,8 +14,9 @@ public class FSLib {
 	
 	static SecureFSInterface _stub;
 	
-	
-	
+	static PublicKey pubKey;
+	static Signature sigSigner;
+	static byte[] id;
 	
 	public static byte[] FS_init(){
 		
@@ -22,7 +24,20 @@ public class FSLib {
 			SecureFSInterface serverInstance = null;
 			try {
 			    Registry registry = LocateRegistry.getRegistry(1099);
-			    SecureFSInterface stub = (SecureFSInterface) registry.lookup("fs.Server");
+			    _stub = (SecureFSInterface) registry.lookup("fs.Server");
+			    System.out.println("connected");
+			    KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+			    SecureRandom secRand = SecureRandom.getInstanceStrong();
+			    keyGen.initialize(2048, secRand);
+			    
+			    KeyPair pair = keyGen.generateKeyPair();
+			    
+			    sigSigner  = Signature.getInstance("SHA1withRSA");
+			    sigSigner.initSign(pair.getPrivate());
+			    
+			    pubKey = pair.getPublic();
+			    
+			    id  = _stub.put_k(null, sigSigner, pubKey);
 			    
 			} catch (Exception e) {
 			    System.err.println("Client exception: " + e.toString());
@@ -35,8 +50,12 @@ public class FSLib {
 	public static void FS_write(int pos, int size, byte[] contents) {
 		
 		byte[] f = {3};
+		
+		
+		
+		
 		try {
-			_stub.FS_write(pos, size, contents);
+			_stub.get(null);
 		} catch (RemoteException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -48,7 +67,7 @@ public class FSLib {
 	public static int FS_read(byte[] id, int pos, int size, byte[] contents ){
 		byte[] f = {3};
 		try {
-			_stub.FS_read(id, pos, size, contents);
+			_stub.get(null);
 		} catch (RemoteException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
