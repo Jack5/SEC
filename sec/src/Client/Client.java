@@ -5,6 +5,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.Vector;
 
 import Server.SecureFSInterface;
 
@@ -22,8 +23,16 @@ public class Client {
 		
 	    Scanner keyboard = new Scanner(System.in);
 	    while(true){
-			String choice = keyboard.nextLine();
-	    	FSLib.manageInput(choice);
+		//	String choice = keyboard.nextLine();
+	    	//FSLib.manageInput(choice);
+	    	System.out.println("AUX");
+	    	int aux = keyboard.nextInt();
+	    	System.out.println("first");
+	    	int firstBlockPos = keyboard.nextInt();
+	    	
+			for(;aux != firstBlockPos; aux--){
+				System.out.println(aux);
+			}
 	    }
 	    
     }

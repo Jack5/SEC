@@ -10,8 +10,12 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.security.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
+import java.util.Vector;
 
+import Server.ContentBlock;
 import Server.Header;
 import Server.SecureFSInterface;
 
@@ -63,6 +67,26 @@ public class FSLib {
 	public static void FS_write(int pos, int size, byte[] contents) {	
 		try {
 			Header savedHeader = (Header) deserialize(_stub.get(id));
+			
+			int lastPos = pos + size - 1;
+			
+			
+			List<ContentBlock> fileContents = (List<ContentBlock>) savedHeader.hashes.values(); //pode dar erro 
+			int fileLength = fileContents.size() * 2048;
+			
+			if(fileLength >= lastPos){ //nao é preciso aumentar a file
+				Vector<Integer> middleBlocksToChange = new Vector<Integer>();
+				int firstBlockPos = pos /2048;
+				int lastBlockPos = lastPos /2048;
+				int aux = --lastBlockPos;
+				for(;aux != firstBlockPos; aux--){
+					middleBlocksToChange.add(aux);
+				}	
+			}else if(fileLength < lastPos){ //file must be increased
+				
+			}
+			
+			
 			
 		} catch (ClassNotFoundException | IOException e) {
 			// TODO Auto-generated catch block

@@ -6,7 +6,7 @@ import java.util.Vector;
 
 public class Header extends Block implements Serializable  {
 
-	Map<byte[],ContentBlock> hashes;
+	public Map<byte[],ContentBlock> hashes;
 	
 	
 }
