@@ -22,6 +22,7 @@ public class FSLib {
 		
 		 //String host = (args.length < 1) ? null : args[0];
 			SecureFSInterface serverInstance = null;
+
 			try {
 			    Registry registry = LocateRegistry.getRegistry(1099);
 			    _stub = (SecureFSInterface) registry.lookup("fs.Server");
@@ -31,13 +32,14 @@ public class FSLib {
 			    keyGen.initialize(2048, secRand);
 			    
 			    KeyPair pair = keyGen.generateKeyPair();
-			    
-			    sigSigner  = Signature.getInstance("SHA1withRSA");
+			    sigSigner  = Signature.getInstance("SHA256withRSA");
 			    sigSigner.initSign(pair.getPrivate());
 			    
 			    pubKey = pair.getPublic();
 			    
-			    id  = _stub.put_k(null, sigSigner, pubKey);
+			    _stub.put_k(null, sigSigner, pubKey);
+			    
+			    id = MessageDigest.getInstance("SHA256").digest(pair.getPublic().toString().getBytes());
 			    
 			} catch (Exception e) {
 			    System.err.println("Client exception: " + e.toString());
@@ -82,14 +84,14 @@ public class FSLib {
 		switch(splited[0]){
 			case "init":
 				FSLib.FS_init();
-					break;
-				case "read":
+				break;
+			case "read":
 				FSLib.FS_read(splited[1].getBytes(),Integer.parseInt(splited[2]),Integer.parseInt(splited[3]),splited[4].getBytes());
 				break;
 			case "write":
 				FSLib.FS_write(Integer.parseInt(splited[1]),Integer.parseInt(splited[2]),splited[3].getBytes());
-			break;
-				case "help":
+				break;
+			case "help":
 			default:
 				System.out.println("Available Commands:");
 				System.out.println("init");
