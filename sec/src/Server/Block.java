@@ -1,18 +1,14 @@
 package Server;
 
+import java.io.Serializable;
 import java.util.Vector;
 
-public class Block {
-	
-	
+public class Block implements Serializable {
 
-	Vector<byte[]> pieces;
-	
-	void addPiece(){
-		byte[] newPiece = new byte[2048];
-		pieces.add(newPiece);
-	}
-	
-	
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 2531580958308393285L;
+		
 	
 }

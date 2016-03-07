@@ -1,5 +1,10 @@
 package Client;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
@@ -7,6 +12,7 @@ import java.rmi.registry.Registry;
 import java.security.*;
 import java.util.Scanner;
 
+import Server.Header;
 import Server.SecureFSInterface;
 
 public class FSLib {
@@ -27,6 +33,7 @@ public class FSLib {
 			    Registry registry = LocateRegistry.getRegistry(1099);
 			    _stub = (SecureFSInterface) registry.lookup("fs.Server");
 			    System.out.println("connected");
+			    
 			    KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
 			    SecureRandom secRand = SecureRandom.getInstanceStrong();
 			    keyGen.initialize(2048, secRand);
@@ -37,9 +44,13 @@ public class FSLib {
 			    
 			    pubKey = pair.getPublic();
 			    
-			    _stub.put_k(null, sigSigner, pubKey);
+			    Header newHeader = new Header();
+			    byte[] serialized = serialize(newHeader);
+			    sigSigner.update(serialized);
+			    byte[] signed = sigSigner.sign();
+			    id =_stub.put_k(null, signed, pubKey);
 			    
-			    id = MessageDigest.getInstance("SHA256").digest(pair.getPublic().toString().getBytes());
+			    System.out.println(id);
 			    
 			} catch (Exception e) {
 			    System.err.println("Client exception: " + e.toString());
@@ -49,20 +60,14 @@ public class FSLib {
 		
 	}
 	
-	public static void FS_write(int pos, int size, byte[] contents) {
-		
-		byte[] f = {3};
-		
-		
-		
-		
+	public static void FS_write(int pos, int size, byte[] contents) {	
 		try {
-			_stub.get(null);
-		} catch (RemoteException e) {
+			Header savedHeader = (Header) deserialize(_stub.get(id));
+			
+		} catch (ClassNotFoundException | IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
 		return;
 	}
 	
@@ -101,6 +106,27 @@ public class FSLib {
 			}
 	}
 		
+	public static byte[] serialize(Object obj) throws IOException {
+	    ByteArrayOutputStream out = new ByteArrayOutputStream();
+	    ObjectOutputStream os = new ObjectOutputStream(out);
+            
+	    os.writeObject(obj);
+	    byte[] outputBytes = out.toByteArray();
+	    out.close();
+            
+	    return outputBytes;
+	}
+	
+	public static Object deserialize(byte[] data) throws IOException, ClassNotFoundException {
+	    ByteArrayInputStream in = new ByteArrayInputStream(data);
+	    ObjectInputStream is = new ObjectInputStream(in);
+            
+	    Object outputObject = is.readObject();
+	    in.close();
+            
+	    return outputObject;
+	}
+	
 }
 	
 	
