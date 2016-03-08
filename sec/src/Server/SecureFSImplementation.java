@@ -29,7 +29,7 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 	 * 
 	 */
 	private static final long serialVersionUID = 7987182049922996428L;
-	static Map<String,Header> headerBlocks= new HashMap<String,Header>();
+	static Map<String, Header> headerBlocks= new HashMap<String,Header>();
 	static Map<String, ContentBlock> contentBlocks = new HashMap<String, ContentBlock>();
 
 	public SecureFSImplementation() throws RemoteException {}
@@ -67,7 +67,7 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 	}
 
 	@Override
-	public String put_k(byte[] data, byte[] signed, PublicKey pubKey) throws RemoteException {
+	public String put_k(Vector<String> data, byte[] signed, PublicKey pubKey) throws RemoteException {
 		String id ;
 
 		//Generate ID = hash of public key
@@ -83,7 +83,7 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 			Signature sigVerify;
 			sigVerify = Signature.getInstance("SHA256withRSA");
 			sigVerify.initVerify(pubKey);
-			sigVerify.update(data);
+			sigVerify.update(serialize(data));
 			boolean result = sigVerify.verify(signed);
 			if(!result){
 				throw new RemoteException("Signature Failed - the sent signed and the data do not match!");
@@ -91,17 +91,13 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 
-		//Generate a newHeader from the received data
-		try {
-			Header newHeader = (Header) deserialize(data);
-			headerBlocks.put(id, newHeader);
-		} catch (ClassNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {			
-			e.printStackTrace();
-		}
+		Header newHeader = new Header(pubKey, signed, data);
+		headerBlocks.put(id, newHeader);
 
 		return id;
 
@@ -111,11 +107,11 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 	public String put_h(byte[] data) throws RemoteException {
 
 		try {
-			ContentBlock newContent = (ContentBlock) deserialize(data);
+			ContentBlock newContent = new ContentBlock(data);
 			String hash = 	Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(data));
 			contentBlocks.put(hash, newContent);
 			return hash;
-		} catch (ClassNotFoundException | IOException | NoSuchAlgorithmException e) {
+		} catch (NoSuchAlgorithmException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
@@ -143,8 +139,5 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 
 		return outputObject;
 	}
-
-
-
 
 }
