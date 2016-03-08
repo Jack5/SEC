@@ -10,8 +10,8 @@ import java.util.Vector;
 
 public interface SecureFSInterface extends Remote {
     
-	public byte[] get(byte[] id) throws RemoteException;
-	public byte[] put_k(byte[] data, byte[] signed, PublicKey pubKey) throws RemoteException;
-	public byte[] put_h(byte[] data) throws RemoteException;
+	public byte[] get(String id) throws RemoteException;
+	public String put_k(byte[] data, byte[] signed, PublicKey pubKey) throws RemoteException;
+	public String put_h(byte[] data) throws RemoteException;
     
 }

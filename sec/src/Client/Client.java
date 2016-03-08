@@ -23,16 +23,9 @@ public class Client {
 		
 	    Scanner keyboard = new Scanner(System.in);
 	    while(true){
-		//	String choice = keyboard.nextLine();
-	    	//FSLib.manageInput(choice);
-	    	System.out.println("AUX");
-	    	int aux = keyboard.nextInt();
-	    	System.out.println("first");
-	    	int firstBlockPos = keyboard.nextInt();
-	    	
-			for(;aux != firstBlockPos; aux--){
-				System.out.println(aux);
-			}
+	    	String choice = keyboard.nextLine();
+	    	FSLib.manageInput(choice);
+	
 	    }
 	    
     }

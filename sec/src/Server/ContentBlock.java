@@ -1,8 +1,14 @@
 package Server;
 
-public class ContentBlock extends Block{
+import java.io.Serializable;
+
+public class ContentBlock implements Serializable{
 	
-	byte[] content;
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 6555536570027771105L;
+	public byte[] content;
 	
 	public ContentBlock(byte[] newContents){
 		content = newContents;
