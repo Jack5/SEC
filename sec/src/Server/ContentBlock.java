@@ -13,4 +13,8 @@ public class ContentBlock implements Serializable{
 	public ContentBlock(byte[] newContents){
 		content = newContents;
 	}
+
+	public ContentBlock() {
+		content = new byte[0];
+	}
 }

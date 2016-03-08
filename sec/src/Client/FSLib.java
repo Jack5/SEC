@@ -95,71 +95,43 @@ public class FSLib {
 	public static void FS_write(int pos, int size, byte[] contents) {	
 	
 		
-		try {
 			
-			Header header = (Header) deserialize(_stub.get(id));
-			size = contents.length;
-			int totalFileSize = 0;
-			if(header.ids.size() != 0){
-				totalFileSize = (header.ids.size() - 1) * BLOCK_SIZE;
-				totalFileSize += header.ids.get(header.ids.size() - 1).length();
-			}
-			int numBlocks = (int) Math.ceil((double)(pos + size) / (double) BLOCK_SIZE);
-			int firstBlockToWrite = (int) Math.ceil((double)pos / (double)BLOCK_SIZE);
-			for(int i = 0; i < firstBlockToWrite - 1; i++){
-				System.out.println("1");
-				ContentBlock b = new ContentBlock(new byte[BLOCK_SIZE]);
-				header.ids.add(_stub.put_h(serialize(b)));
-			}
-			if(Math.ceil((double)(pos + size) / (double) BLOCK_SIZE) == Math.ceil((double)(pos) / (double) BLOCK_SIZE)){ //se pos e pos+size no mesmo bloco
-				byte[] lastBlock = new byte[(pos+size)%BLOCK_SIZE];
-				System.arraycopy(contents, 0, lastBlock, pos, contents.length);
-				ContentBlock block = new ContentBlock(lastBlock);
-				header.ids.add(_stub.put_h(serialize(block)));
-			}
-			else{ //se blocos diferentes
-				byte[] firstBlockWritten = new byte[BLOCK_SIZE];
-				int nrBytes = size;
-				int lastByteWritten = 0;
-				int partOfContents = (BLOCK_SIZE -1) - pos;
-				nrBytes -= partOfContents;
-				lastByteWritten += partOfContents;
-				System.arraycopy(contents,0,firstBlockWritten,pos,partOfContents );
-				ContentBlock block  = new ContentBlock(firstBlockWritten);
-				header.ids.addElement(_stub.put_h(serialize(block)));
-				while(nrBytes > BLOCK_SIZE){
-					byte[] newBlock = new byte[BLOCK_SIZE];
-					System.arraycopy(contents,lastByteWritten,newBlock,0,BLOCK_SIZE);
-					block = new ContentBlock(newBlock);
-					header.ids.addElement(_stub.put_h(serialize(block)));
-					nrBytes -= BLOCK_SIZE;
-					lastByteWritten += BLOCK_SIZE -1;
+			try {
+				Header header = (Header) deserialize(_stub.get(id));
+				size = contents.length;
+				int totalFileSize = 0;
+				ContentBlock savedBlock;
+				if(header.ids.size() > 0){ //ja existem blocos
+					savedBlock = (ContentBlock) deserialize(_stub.get(header.ids.get(0)));
 				}
-				if(nrBytes > 0){ //ainda ha mais para escrever
-					byte[] lastBlockToWrite = new byte[nrBytes];
-					System.arraycopy(contents, lastByteWritten, lastBlockToWrite, 0, nrBytes);
-					block = new ContentBlock(lastBlockToWrite);
-					header.ids.addElement(_stub.put_h(serialize(block)));
+				else{
+					savedBlock = new ContentBlock();
 				}
+				
+				if(savedBlock.content.length < (pos + size + 1)){
+					savedBlock.content = new byte[pos+size+1];
+				}
+				System.arraycopy(contents, 0, savedBlock.content,pos, contents.length);
+				String hashContent = _stub.put_h(serialize(savedBlock));
+				
+				header.ids.set(0, hashContent);
+				
+				Pair<byte[], byte[]> signed = SignAndSerialize(header);
+				
+				_stub.put_k(signed.getValue(), signed.getKey(), keyPair.getPublic());
+				
+			} catch (ClassNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (RemoteException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
-			byte[] b = new byte[BLOCK_SIZE];
-			System.arraycopy(contents, 0, b, pos%BLOCK_SIZE, size);
-			ContentBlock block = new ContentBlock(b);
-			header.ids.add(_stub.put_h(serialize(block)));
-
-			Pair<byte[], byte[]> pair = SignAndSerialize(header);
-			id =_stub.put_k(pair.getValue(), pair.getKey(), keyPair.getPublic());
-
-		    System.out.println(id);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
-		
+			
+					
 	}
 	
 	public static int FS_read(String id, int pos, int size, byte[] contents ){
