@@ -27,6 +27,7 @@ import Server.ContentBlock;
 import Server.Header;
 import Server.SecureFSInterface;
 import javafx.util.Pair;
+import jdk.nashorn.internal.ir.BlockStatement;
 
 public class FSLib {
 
@@ -146,30 +147,101 @@ public class FSLib {
 				//TODO handle wrong signature
 				return;
 			}
+						
+			Vector<String> ids = header.ids;
+			int totalFileSize = 0;
+			byte[] lastContent = null;
 			
-			// *** pseudo-code ****
+			if(!ids.isEmpty()){
+				lastContent = ((ContentBlock) deserialize(_stub.get(ids.lastElement()))).content;
+				totalFileSize = BlockManager.getFileSize(header, lastContent);
+			}
+			
+			
+			int[] posModifiedBlocks = BlockManager.getBlockIndices(pos, size);
+			int[] posBlockToPad = BlockManager.getBlockIndicesToPad(pos+size, totalFileSize);
+			
+			Vector<byte[]> newContents = new Vector<byte[]>();
+			
+			//padding
+			if(posBlockToPad[0] != -1){
+				System.out.println("need to pad");	
+				newContents = BlockManager.addPadding(ids.size() - 1, posModifiedBlocks[posModifiedBlocks.length-1], lastContent, (pos+size)%BlockManager.BLOCK_SIZE);
+				
+				if(totalFileSize % BlockManager.BLOCK_SIZE == 0)
+					ids.add(_stub.put_h(newContents.elementAt(0)));
+				else
+					ids.set(0, _stub.put_h(newContents.elementAt(0)));
+				for(int i = 1; i < newContents.size(); i++){
+					System.out.println("ola");
+					ids.add(_stub.put_h(newContents.elementAt(i)));	
+				}	
+			}
+			//no need to pad
+			else{
+				System.out.println("no need to pad");				
+			}
+			Pair<byte[],byte[]> firstLastOriginalBlocks = null;
+			
+			if(newContents.isEmpty()){
+				firstLastOriginalBlocks = new Pair<byte[],byte[]>(((ContentBlock) deserialize(_stub.get(ids.get(posModifiedBlocks[0])))).content,((ContentBlock) deserialize(_stub.get(ids.get(posModifiedBlocks[posModifiedBlocks.length -1])))).content);
+			}else{
+				byte[] firstBlock = null;
+				if(posModifiedBlocks[0] == posBlockToPad[0]){
+					firstBlock = newContents.get(0); 
+				}else{
+					firstBlock = ((ContentBlock) deserialize(_stub.get(ids.get(posModifiedBlocks[0])))).content;
+				}
+				firstLastOriginalBlocks = new Pair<byte[],byte[]>(firstBlock,newContents.lastElement());
+			}
+			
+			Vector<byte[]> finalModifiedBlocks = BlockManager.newBlocks(firstLastOriginalBlocks, pos, contents);
+			
 			/*
-			 *  vector<string> ids = vector of ids of the content block of the file
-			 *  vector<int> pos_modified_blocks = vector of relative positions of the blocks to be modified in ids
-			 *  vector<byte[]> blocks = getNewBlocks()		
-			 *  foreach(block b: blocks){
-			 *  	id = put_h(b);
-			 *  	ids[pos_modified_blocks[count++]] = id
-			 *  }
-			 *  recalculate signature;
-			 *  put_k(newheader)
-			 * 
-			 */
-
+			
+			if(pos+size > totalFileSize){
+				System.out.println("adding new blocks to write");
+				newBlocks = BlockManager.splitIntoBlocks(contents, lastContent);
+				int i = 0;
+				int lastWrittenBlock = ids.size() - 1;
+				for(byte[] b : newBlocks){
+					System.out.println("adeus");
+					if(posModifiedBlocks[i] > lastWrittenBlock){
+						System.out.println("add");
+						ids.add(_stub.put_h(b));
+					}
+					else{
+						System.out.println("set");
+						ids.set(posModifiedBlocks[i], _stub.put_h(b));
+					}							
+				}
+			}
+			else{
+				//TODO
+			}
+			*/
+			_stub.put_k(ids, Sign(ids), keyPair.getPublic());
+			
+			/*TEST CODE*/
+			Header header2 = (Header) deserialize(_stub.get(ownedFileId));
+			
+			byte[] lastContent2 = ((ContentBlock) deserialize(_stub.get(header2.ids.lastElement()))).content;
+			totalFileSize = BlockManager.getFileSize(header2, lastContent2);
+			
+			System.out.println("size after: " + totalFileSize );
+			
+			
 			/* SIMPLE CODE TO TEST WRITING TO 2 BLOCKs ALWAYS OVERWRITING PREVIOUS CONTENT */
+			
+			/*
 			int half = contents.length / 2;
 			byte[] firstHalf = Arrays.copyOfRange(contents, 0, half);
 			byte[] secondHalf = Arrays.copyOfRange(contents, half, contents.length);
-			Vector<String> ids = new Vector<String>();			
+			Vector<String> ids2 = new Vector<String>();			
 			ids.add(_stub.put_h(firstHalf));
 			ids.add(_stub.put_h(secondHalf));
-			_stub.put_k(ids, Sign(ids), keyPair.getPublic());
-		
+			_stub.put_k(ids2, Sign(ids2), keyPair.getPublic());
+			 */
 
 		} catch (ClassNotFoundException | IOException e) {
 			// TODO Auto-generated catch block
