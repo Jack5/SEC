@@ -14,4 +14,7 @@ public class ContentBlock implements Serializable{
 	public ContentBlock() {
 		content = new byte[0];
 	}
+	public ContentBlock(int blockSize) {//block with zeros
+		content = new byte[blockSize];
+	}
 }
