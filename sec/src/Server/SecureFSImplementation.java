@@ -50,6 +50,8 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 	@Override
 	public byte[] get(String id) throws RemoteException {
 				
+		System.out.println("get: " + id);
+		
 		byte[] toSend = null;
 
 		try {
@@ -68,6 +70,7 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 
 	@Override
 	public String put_k(Vector<String> data, byte[] signed, PublicKey pubKey) throws RemoteException {
+		
 		String id ;
 
 		//Generate ID = hash of public key
@@ -77,6 +80,8 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 			e1.printStackTrace();
 			throw new RemoteException("Internal Error");
 		}
+		
+		System.out.println("put_k: " + id);
 
 		//Verify received data to be that which was signed
 		try {
@@ -110,6 +115,8 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 			ContentBlock newContent = new ContentBlock(data);
 			String hash = 	Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(data));
 			contentBlocks.put(hash, newContent);
+			
+			System.out.println("put_h: " + hash);
 			return hash;
 		} catch (NoSuchAlgorithmException e) {
 			// TODO Auto-generated catch block
