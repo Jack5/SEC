@@ -51,20 +51,21 @@ public class BlockManager {
 	}
 	
 	public static int[] getBlockIndicesToPad(int pos, int totalSize){
-		int lastWrittenBlock = getBlockByPos(totalSize);
+		int lastWrittenBlock = getBlockByPos(totalSize - 1);
 		int lastBlockToPad = getBlockByPos(pos);
 		int numBlocks = 0;
 		int relativePos = pos % BLOCK_SIZE;
-		int relativeEnd = totalSize % BLOCK_SIZE;
+		int relativeEnd = (totalSize - 1 )% BLOCK_SIZE;
+		if(relativeEnd == -1) relativeEnd = 2;
 		
 		if(lastBlockToPad > lastWrittenBlock){
 			numBlocks += lastBlockToPad - lastWrittenBlock;	
 			//somar 1 se o eof nao estiver no fim do bloco
-			if(relativeEnd != 0) numBlocks++;
+			if(relativeEnd != 2) numBlocks++;
 			if(totalSize == 0) numBlocks++;
 		}
 		
-		if(lastBlockToPad == lastWrittenBlock && relativePos > relativeEnd ){
+		if(lastBlockToPad == lastWrittenBlock && relativePos > relativeEnd){
 			numBlocks++;
 		}
 				
@@ -84,13 +85,13 @@ public class BlockManager {
 	public static Vector<byte[]> addPadding(int existingBlocks,int lastBlockToWrite,byte[] curLastBlockContent, int posInBlockCoords){
 		Vector<byte[]> result = new Vector<byte[]>();
 		if(curLastBlockContent == null) curLastBlockContent = new byte[0];
+		if(existingBlocks == -1) existingBlocks = 0;
 		if(existingBlocks < lastBlockToWrite){ //são necessários mais blocos
 			
 			System.out.println("need more blocks");
 			
-			result.add(fillBlockWithZeros(curLastBlockContent)); //// fills last block with zeros
-			
-			if(existingBlocks == -1) existingBlocks = 0;
+			if(curLastBlockContent.length % BLOCK_SIZE != 0)
+				result.add(fillBlockWithZeros(curLastBlockContent)); //// fills last block with zeros
 			
 			int offsetBlocks = lastBlockToWrite - existingBlocks - 1;
 			

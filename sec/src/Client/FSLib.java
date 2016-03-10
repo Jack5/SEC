@@ -34,7 +34,6 @@ public class FSLib {
 
 	static KeyPair keyPair;
 	static String ownedFileId;
-	static final int BLOCK_SIZE = 4096;
 	
 
 	//methods for test purposes
@@ -221,13 +220,8 @@ public class FSLib {
 			//insert the new blocks into the header
 			int index = posModifiedBlocks[0];
 			for(byte[] finalForm : finalModifiedBlocks){
-				if(index > posModifiedBlocks.length){
-					
-				}
 				ids.set(index, _stub.put_h(finalForm));
-				
-				index++;
-				
+				index++;		
 			}
 		
 			_stub.put_k(ids, Sign(ids), keyPair.getPublic());
@@ -371,7 +365,8 @@ public class FSLib {
 			FSLib.FS_write(Integer.parseInt(splited[1]),Integer.parseInt(splited[2]),newBuffer2);
 			break;
 		case "dread":
-			FSLib.debugRead(splited[1]);
+			FSLib.debugRead();
+			break;
 		case "help":
 		default:
 			System.out.println("Available Commands:");
@@ -403,10 +398,10 @@ public class FSLib {
 		return outputObject;
 	}
 	
-	public static void debugRead(String id){
+	public static void debugRead(){
 		
 		//get header from server
-		Header header = getHeader(id);
+		Header header = getHeader(ownedFileId);
 		
 		int count = 0;
 		for(String blockId : header.ids){
