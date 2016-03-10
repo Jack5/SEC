@@ -15,19 +15,19 @@ import javafx.util.Pair;
 
 public class BlockManager {
 	
-	static final int BLOCK_SIZE = 4096;
+	static final int BLOCK_SIZE = 3;
 	
 	static byte[] emptyBlock = new byte[BLOCK_SIZE];
-	static String hashEmpty;
+	public static String hashEmpty;
 	
-	/*
-	public void hashEmptyBlock(SecureFSInterface stub){
+	
+	public static void hashEmptyBlock(SecureFSInterface stub){
 		try {
 			hashEmpty = stub.put_h(serialize(emptyBlock));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	}*/
+	}
 	
 	public static int getBlockByPos(int pos){
 		return (int) Math.floor((double)(pos) / (double) BLOCK_SIZE);
@@ -41,7 +41,7 @@ public class BlockManager {
 	
 	public static int[] getBlockIndices(int pos, int size){
 		int firstBlockToWrite = getBlockByPos(pos);
-		int lastBlockToWrite = getBlockByPos(pos+size);
+		int lastBlockToWrite = getBlockByPos(pos+size-1);
 		int totalBlocks = lastBlockToWrite - firstBlockToWrite + 1;
 		int[] result = new int[totalBlocks];
 		for(int i = 0; i < totalBlocks; i++){
@@ -64,7 +64,7 @@ public class BlockManager {
 			if(totalSize == 0) numBlocks++;
 		}
 		
-		if(lastBlockToPad == lastWrittenBlock && relativePos > relativeEnd){
+		if(lastBlockToPad == lastWrittenBlock && relativePos > relativeEnd ){
 			numBlocks++;
 		}
 				
@@ -196,33 +196,51 @@ public class BlockManager {
 				System.out.println("add empty block");
 				result.add(emptyBlock);
 			}
-			//fills last block with 0s until the pos
-			if(posInBlockCoords > 0){ //offset in lastBlock
-				
+			//fills last block with 0s until the pos	
 				System.out.println("final block");
 				String hash = null;
-				result.add(new byte[posInBlockCoords]);		
-			}
+				result.add(new byte[posInBlockCoords+1]);		
+			
 		}else { //vamos escrever num bloco que já existe
-			if(posInBlockCoords > curLastBlockContent.length + 1 && lastBlockToWrite == existingBlocks){ //checks if there is need for offset in the lastBlock
 				int numZeros = posInBlockCoords - curLastBlockContent.length;
 				byte[] byteOfZeros = new byte[numZeros];
-				byte[] newLastContent = new byte[posInBlockCoords];
+				byte[] newLastContent = new byte[posInBlockCoords+1];
 				System.arraycopy(curLastBlockContent, 0, newLastContent, 0, curLastBlockContent.length);
 				System.arraycopy(byteOfZeros, 0, newLastContent, curLastBlockContent.length , numZeros);
 				result.add(newLastContent);
-			}			
 		}
 		return result;
 	}
 	
-	public static Vector<byte[]> newBlocks(Pair<byte[],byte[]> oldContent, int pos, byte[] content){
+	public static Vector<byte[]> newBlocks(Pair<byte[],byte[]> oldContent, int pos, byte[] content, int nrBlocksModified){
 		int initialPos = pos % BLOCK_SIZE;
-		int finalPos = (content.length + pos) % BLOCK_SIZE;		
+		int finalPos = (pos+content.length) % BLOCK_SIZE; 	
 		Vector<byte[]> result = new Vector<byte[]>();
+
+		if(nrBlocksModified == 1){
+			System.arraycopy(content, 0, oldContent.getKey(), initialPos, content.length);
+			result.add(oldContent.getKey());
+		}else{
+			//Add content in first block from pos
+			System.arraycopy(content, 0, oldContent.getKey(), initialPos, BLOCK_SIZE - initialPos);
+			content = Arrays.copyOfRange(content, BLOCK_SIZE - initialPos,content.length ); //erase content already written
+			result.add(oldContent.getKey());
+			
+			//copy full blocks
+			while(content.length > BLOCK_SIZE){
+				byte[] newFullBlock = new byte[BLOCK_SIZE];
+				System.arraycopy(content, 0, newFullBlock, 0, BLOCK_SIZE);
+				content = Arrays.copyOfRange(content,  BLOCK_SIZE, content.length);
+				result.add(newFullBlock);
+			}
+			
+			if(content.length > 0){ //if there is smth left
+				System.arraycopy(content, 0, oldContent.getValue(), 0, content.length);
+				result.add(oldContent.getValue());
+			}	
+		}
 		
-		System.arraycopy(content, 0, oldContent.getKey(), pos, BLOCK_SIZE - pos);
-		
+		return result;
 		/*
 		if(numBlocks == 1){
 			int lengthOldContent = oldContent.elementAt(0).length;
@@ -241,7 +259,6 @@ public class BlockManager {
 			
 		}
 		*/
-		return oldContent;
 	}
 	
 	public static Vector<byte[]> splitIntoBlocks(byte[] content, byte[] firstBlock){
@@ -298,7 +315,7 @@ public class BlockManager {
 		return ((BLOCK_SIZE - contBlock.content.length) -2); 
 	}
 	
-	
+	*/
 	public static byte[] serialize(Object obj) throws IOException {
 	    ByteArrayOutputStream out = new ByteArrayOutputStream();
 	    ObjectOutputStream os = new ObjectOutputStream(out);
@@ -309,7 +326,7 @@ public class BlockManager {
             
 	    return outputBytes;
 	}
-	
+	/*
 	public static Object deserialize(byte[] data) throws IOException, ClassNotFoundException {
 	    ByteArrayInputStream in = new ByteArrayInputStream(data);
 	    ObjectInputStream is = new ObjectInputStream(in);

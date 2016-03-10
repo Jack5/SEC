@@ -37,6 +37,7 @@ public class FSLib {
 	static KeyPair keyPair;
 	static String ownedFileId;
 	static final int BLOCK_SIZE = 4096;
+	
 
 	//method for signing the contents of an header
 	private static byte[] Sign(Vector<String> ids){
@@ -119,7 +120,7 @@ public class FSLib {
 			ownedFileId =_stub.put_k(emptyIds, Sign(emptyIds), keyPair.getPublic());
 
 			System.out.println("ID associated with this user is:\n" + ownedFileId);
-
+			BlockManager.hashEmptyBlock(_stub);
 		} catch (Exception e) {
 			System.err.println("Client exception: " + e.toString());
 			e.printStackTrace();
@@ -128,8 +129,8 @@ public class FSLib {
 
 	}
 
-	public static void FS_write(int pos, int size, byte[] contents) {	
-		
+	public static void FS_write(int pos, int size,Buffer buffer) {	
+		byte[] contents = buffer.getContent();
 		try {
 			//get owned file from server
 			Header header = (Header) deserialize(_stub.get(ownedFileId));
@@ -159,89 +160,72 @@ public class FSLib {
 			
 			
 			int[] posModifiedBlocks = BlockManager.getBlockIndices(pos, size);
-			int[] posBlockToPad = BlockManager.getBlockIndicesToPad(pos+size, totalFileSize);
+			int[] posBlockToPad = BlockManager.getBlockIndicesToPad(pos+size-1, totalFileSize);
 			
 			Vector<byte[]> newContents = new Vector<byte[]>();
 			
 			//padding
-			if(posBlockToPad[0] != -1){
-				System.out.println("need to pad");	
-				newContents = BlockManager.addPadding(ids.size() - 1, posModifiedBlocks[posModifiedBlocks.length-1], lastContent, (pos+size)%BlockManager.BLOCK_SIZE);
+			if(posBlockToPad[0] != -1){	
+				newContents = BlockManager.addPadding(ids.size() - 1, posModifiedBlocks[posModifiedBlocks.length-1], lastContent, (pos+size-1)%BlockManager.BLOCK_SIZE);
 				
 				if(totalFileSize % BlockManager.BLOCK_SIZE == 0)
-					ids.add(_stub.put_h(newContents.elementAt(0)));
+					ids.add(BlockManager.hashEmpty);
 				else
-					ids.set(0, _stub.put_h(newContents.elementAt(0)));
+					ids.set(ids.size() - 1,BlockManager.hashEmpty);
 				for(int i = 1; i < newContents.size(); i++){
-					System.out.println("ola");
-					ids.add(_stub.put_h(newContents.elementAt(i)));	
+				
+					ids.add(BlockManager.hashEmpty);	
 				}	
 			}
-			//no need to pad
-			else{
-				System.out.println("no need to pad");				
-			}
+
 			Pair<byte[],byte[]> firstLastOriginalBlocks = null;
 			
-			if(newContents.isEmpty()){
-				firstLastOriginalBlocks = new Pair<byte[],byte[]>(((ContentBlock) deserialize(_stub.get(ids.get(posModifiedBlocks[0])))).content,((ContentBlock) deserialize(_stub.get(ids.get(posModifiedBlocks[posModifiedBlocks.length -1])))).content);
+			if(newContents.isEmpty()){ //there was no padding
+				if(!ids.isEmpty()){
+					firstLastOriginalBlocks = new Pair<byte[],byte[]>(((ContentBlock) deserialize(_stub.get(ids.get(posModifiedBlocks[0])))).content,((ContentBlock) deserialize(_stub.get(ids.get(posModifiedBlocks[posModifiedBlocks.length -1])))).content);
+				}
+				else{
+					firstLastOriginalBlocks = new Pair<byte[],byte[]>(new byte[contents.length],new byte[contents.length]);
+					newContents.add(firstLastOriginalBlocks.getKey());
+					ids.add(BlockManager.hashEmpty);
+				}
 			}else{
 				byte[] firstBlock = null;
-				if(posModifiedBlocks[0] == posBlockToPad[0]){
-					firstBlock = newContents.get(0); 
+				if(posModifiedBlocks[0] >= posBlockToPad[0]){
+					int i = 0;
+					for(int aux : posBlockToPad){
+						if(posModifiedBlocks[0] == aux){
+							firstBlock = newContents.get(i);
+							break;
+						}
+						i++;
+					}
+					 
 				}else{
 					firstBlock = ((ContentBlock) deserialize(_stub.get(ids.get(posModifiedBlocks[0])))).content;
 				}
 				firstLastOriginalBlocks = new Pair<byte[],byte[]>(firstBlock,newContents.lastElement());
 			}
 			
-			Vector<byte[]> finalModifiedBlocks = BlockManager.newBlocks(firstLastOriginalBlocks, pos, contents);
+			//ids has all the blocks needed for the writing operations
 			
-			/*
+			Vector<byte[]> finalModifiedBlocks = BlockManager.newBlocks(firstLastOriginalBlocks, pos, contents, posModifiedBlocks.length);
 			
-			if(pos+size > totalFileSize){
-				System.out.println("adding new blocks to write");
-				newBlocks = BlockManager.splitIntoBlocks(contents, lastContent);
-				int i = 0;
-				int lastWrittenBlock = ids.size() - 1;
-				for(byte[] b : newBlocks){
-					System.out.println("adeus");
-					if(posModifiedBlocks[i] > lastWrittenBlock){
-						System.out.println("add");
-						ids.add(_stub.put_h(b));
-					}
-					else{
-						System.out.println("set");
-						ids.set(posModifiedBlocks[i], _stub.put_h(b));
-					}							
+			//insert the new blocks into the header
+			int index = posModifiedBlocks[0];
+			for(byte[] finalForm : finalModifiedBlocks){
+				if(index > posModifiedBlocks.length){
+					
 				}
+				ids.set(index, _stub.put_h(finalForm));
+				
+				index++;
+				
 			}
-			else{
-				//TODO
-			}
-			*/
+		
 			_stub.put_k(ids, Sign(ids), keyPair.getPublic());
 			
-			/*TEST CODE*/
-			Header header2 = (Header) deserialize(_stub.get(ownedFileId));
-			
-			byte[] lastContent2 = ((ContentBlock) deserialize(_stub.get(header2.ids.lastElement()))).content;
-			totalFileSize = BlockManager.getFileSize(header2, lastContent2);
-			
-			System.out.println("size after: " + totalFileSize );
-			
-			
-			/* SIMPLE CODE TO TEST WRITING TO 2 BLOCKs ALWAYS OVERWRITING PREVIOUS CONTENT */
-			
-			/*
-			int half = contents.length / 2;
-			byte[] firstHalf = Arrays.copyOfRange(contents, 0, half);
-			byte[] secondHalf = Arrays.copyOfRange(contents, half, contents.length);
-			Vector<String> ids2 = new Vector<String>();			
-			ids.add(_stub.put_h(firstHalf));
-			ids.add(_stub.put_h(secondHalf));
-			_stub.put_k(ids2, Sign(ids2), keyPair.getPublic());
-			 */
+		
 
 		} catch (ClassNotFoundException | IOException e) {
 			// TODO Auto-generated catch block
@@ -250,7 +234,7 @@ public class FSLib {
 
 	}
 
-	public static int FS_read(String id, int pos, int size, byte[] contents ){
+	public static int FS_read(String id, int pos, int size, Buffer buffer ){
 		try {
 
 			Header header = (Header) deserialize(_stub.get(id));
@@ -286,13 +270,59 @@ public class FSLib {
 			 *  return read_bytes.length
 			 */
 			
-			/* SIMPLE CODE THAT READS ALL CONTENTS OF A FILE */
+			int currentBlockBeingRead = BlockManager.getBlockByPos(pos);
+			
+			if(currentBlockBeingRead > header.ids.size() - 1){
+				System.out.println("Initial Pos exceeds EOF!");
+				return 0;
+			}
+			
+			if(currentBlockBeingRead == header.ids.size() -1 && pos%BlockManager.BLOCK_SIZE > header.ids.lastElement().length()){
+				System.out.println("Initial Pos exceeds EOF!");
+				return 0;
+			}
+			
+			
+			
+			int bytesRead = 0 ;
+			
+			int totalFileSize = BlockManager.getFileSize(header, ((ContentBlock) deserialize(_stub.get(header.ids.lastElement()))).content);
+			int bytesToBeRead = Math.min(totalFileSize - pos , size);
+			int lastBlockToRead = BlockManager.getBlockByPos(pos + bytesToBeRead - 1);
+			byte[] readBytes = new byte[bytesToBeRead];
+			
+			//Read Routines
+			byte[] curBlock = ((ContentBlock) deserialize(_stub.get(header.ids.get(currentBlockBeingRead)))).content;
+			int bytesToReadInFirstBlock = Math.min( curBlock.length - (pos % BlockManager.BLOCK_SIZE), size);
+			System.arraycopy(curBlock, pos % BlockManager.BLOCK_SIZE, readBytes, bytesRead, bytesToReadInFirstBlock);
+			bytesRead += bytesToReadInFirstBlock;
+			currentBlockBeingRead++;
+			
+			for(; currentBlockBeingRead < lastBlockToRead ; currentBlockBeingRead++){
+				curBlock = ((ContentBlock) deserialize(_stub.get(header.ids.get(currentBlockBeingRead)))).content;
+				System.arraycopy(curBlock, 0, readBytes, bytesRead, BlockManager.BLOCK_SIZE);
+				bytesRead += BlockManager.BLOCK_SIZE;
+			}
+			
+			if(currentBlockBeingRead == lastBlockToRead){
+				curBlock = ((ContentBlock) deserialize(_stub.get(header.ids.get(currentBlockBeingRead)))).content;
+				System.arraycopy(curBlock, 0, readBytes, bytesRead, bytesToBeRead - bytesRead);
+				bytesRead += bytesToBeRead - bytesRead;
+			}
+			
+			buffer.setContent(readBytes);
+			
+			
+			/* SIMPLE CODE THAT READS ALL CONTENTS OF A FILE 
 			int count = 1;
 			for(String blockId : header.ids){
 				ContentBlock block = (ContentBlock) deserialize(_stub.get(blockId));
 				System.out.println("block " + count++ + ":\n" + new String(block.content));
 			}
-			
+			*/
+			//END
+
+			return bytesRead;
 		} catch (RemoteException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -315,16 +345,23 @@ public class FSLib {
 			FSLib.FS_init();
 			break;
 		case "read":
-			FSLib.FS_read(splited[1],Integer.parseInt(splited[2]),Integer.parseInt(splited[3]),splited[4].getBytes());
+			Buffer newBuffer = new Buffer();
+			int bytesRead  = FSLib.FS_read(splited[1],Integer.parseInt(splited[2]),Integer.parseInt(splited[3]),newBuffer);
+			if(bytesRead != 0){
+				System.out.println(new String (newBuffer.getContent()));
+				System.out.println("Bytes Read : " + bytesRead);
+			}
 			break;
 		case "write":
-			FSLib.FS_write(Integer.parseInt(splited[1]),Integer.parseInt(splited[2]),splited[3].getBytes());
+			Buffer newBuffer2 = new Buffer();
+			newBuffer2.setContent(splited[3].getBytes());
+			FSLib.FS_write(Integer.parseInt(splited[1]),Integer.parseInt(splited[2]),newBuffer2);
 			break;
 		case "help":
 		default:
 			System.out.println("Available Commands:");
 			System.out.println("init");
-			System.out.println("read id pos size contents");
+			System.out.println("read id pos size ");
 			System.out.println("write pos size contents");
 			break;
 		}
