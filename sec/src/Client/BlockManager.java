@@ -15,7 +15,7 @@ import javafx.util.Pair;
 
 public class BlockManager {
 	
-	static final int BLOCK_SIZE = 3;
+	public static final int BLOCK_SIZE = 3;
 	
 	static byte[] emptyBlock = new byte[BLOCK_SIZE];
 	public static String hashEmpty;

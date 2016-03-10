@@ -37,6 +37,18 @@ public class FSLib {
 	static final int BLOCK_SIZE = 4096;
 	
 
+	//methods for test purposes
+	public static PublicKey getPubKey(){
+		return keyPair.getPublic();
+	}
+	
+	public static String getId(){
+		return ownedFileId;
+	}
+	
+
+	
+	////////////////////////////
 	//method for signing the contents of an header
 	private static byte[] Sign(Vector<String> ids){
 		byte[] serialized = null;
