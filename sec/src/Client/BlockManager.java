@@ -23,7 +23,7 @@ public class BlockManager {
 	
 	public static void hashEmptyBlock(SecureFSInterface stub){
 		try {
-			hashEmpty = stub.put_h(serialize(emptyBlock));
+			hashEmpty = stub.put_h(emptyBlock);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -79,103 +79,6 @@ public class BlockManager {
 		}
 		return result;
 	}
-	
-	/*
-	//RETURN TYPE????
-	public static void writeBlocks(int totalFileSize, int pos, int size, byte[] content, ContentBlock curLastBlock, Header curHeader,SecureFSInterface stub) throws Exception{
-
-		int firstBlockToWrite = getBlockByPos(pos);
-		int lastBlockToWrite = getBlockByPos(pos+size);
-		int posInBlockCoords = pos % BLOCK_SIZE;
-		int lastPosInBlockCoords = (pos+size) % BLOCK_SIZE;
-
-		Vector<ContentBlock> newContentBlocksToAdd = new Vector<ContentBlock>();
-
-		if(curLastBlock == null){ //there is no content in file
-			curLastBlock = new ContentBlock();
-		}
-
-		//Writing operations
-		if(totalFileSize - 1 >= pos){ //se o pos se encontra já alocado
-			Vector<Integer> changedBlocks = new Vector<Integer>(); //vector to track which blocks are changed -> cases where writes are made within the blocks
-			for(int aux= firstBlockToWrite; aux <= lastBlockToWrite; aux++){
-				changedBlocks.add(aux);
-			}
-			ContentBlock firstBlock = null;
-			try {
-				firstBlock = (ContentBlock)  deserialize(stub.get(Integer.toString(firstBlockToWrite)));
-			} catch (ClassNotFoundException | IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			if(firstBlock == null){throw new Exception("Error on first block to write math");}
-			int numberOfFreeBytes = BLOCK_SIZE - firstBlock.content.length;
-
-			Vector<ContentBlock> newContentBlocks = splitIntoBlocks(content,firstBlock);
-
-			for(ContentBlock newBlock : newContentBlocks){
-				String hash = stub.put_h(serialize(newBlock));
-				curHeader.ids.add(firstBlockToWrite, hash);
-				firstBlockToWrite++;
-			}
-		}
-
-
-		if(size <= numberOfFreeBytes){ //caso simples
-			System.arraycopy(content, 0, firstBlock.content,firstBlock.content.length -1, size);
-			content = Arrays.copyOfRange(content, 0, size); //erase written bytes
-			////////////////////// RETURN ???? ///////////////////////////////
-		}else{ //size is bigger than one block
-			System.arraycopy(content, 0, firstBlock.content, firstBlock.content.length -1, numberOfFreeBytes);
-			content = Arrays.copyOfRange(content, numberOfFreeBytes -1,content.length );
-			//split the rest into blocks
-			Vector<ContentBlock> newContentBlocks = splitIntoBlocks(content,firstBlock); 
-			for(int aux = 0; aux < newContentBlocks.size() ; aux++){ //get only the full blocks.
-				String blockHash = stub.put_h(serialize(newContentBlocks.get(aux)));
-				curHeader.ids.set(changedBlocks.get(aux), blockHash); //em principio newContentBlocks.size == changedBlocks
-			}
-			//last incomplete Block
-			ContentBlock lastBlock = newContentBlocks.lastElement();
-			ContentBlock savedBlock = (ContentBlock) deserialize(stub.get(curHeader.ids.get(changedBlocks.lastElement())));
-			System.arraycopy(lastBlock.content, 0, savedBlock.content, 0, lastBlock.content.length);
-			String newHash = stub.put_h(serialize(savedBlock));
-			curHeader.ids.set(changedBlocks.lastElement(), newHash);
-		}
-
-	}else{
-		//Append para o fim
-		int numberOfFreeBytes = BLOCK_SIZE - curLastBlock.content.length;
-		if(size <= numberOfFreeBytes){ //caso simples
-			System.arraycopy(content, 0, curLastBlock.content, posInBlockCoords, content.length);
-
-		}else{ 
-			int posInContent = 0;
-			int numberOfBytesLeft = content.length;
-			System.arraycopy(content, 0, curLastBlock.content, posInBlockCoords, numberOfFreeBytes);
-			posInContent += numberOfFreeBytes -1;
-			numberOfBytesLeft -= numberOfBytesLeft;
-			if(numberOfBytesLeft > 0){				
-				int numberOfFullBlocks =  numberOfBytesLeft / BLOCK_SIZE;
-				while(numberOfBytesLeft > 0){ //add all full content blocks that exist
-					ContentBlock newContent = new ContentBlock();
-					System.arraycopy(content, posInContent, newContent, 0, BLOCK_SIZE);
-					newContentBlocksToAdd.addElement(newContent);
-					numberOfBytesLeft -= BLOCK_SIZE;
-					posInContent += (BLOCK_SIZE -1);
-				}
-				if(numberOfBytesLeft > 0){ //ainda ha algum content
-					byte[] lastContent = new byte[numberOfBytesLeft];
-					System.arraycopy(content, posInContent, lastContent, 0, numberOfBytesLeft);
-					ContentBlock lastBlock = new ContentBlock(lastContent);
-					newContentBlocksToAdd.add(lastBlock);
-				}
-			}
-
-
-		}
-
-	}
-*/
 
 	
 	public static Vector<byte[]> addPadding(int existingBlocks,int lastBlockToWrite,byte[] curLastBlockContent, int posInBlockCoords){
@@ -241,65 +144,6 @@ public class BlockManager {
 		}
 		
 		return result;
-		/*
-		if(numBlocks == 1){
-			int lengthOldContent = oldContent.elementAt(0).length;
-			int newSize = Math.max(lengthOldContent, finalPos);
-			byte[] newBlock = new byte[newSize];
-			System.arraycopy(oldContent.elementAt(0), 0, newBlock, 0, initialPos);
-			System.arraycopy(content, 0, newBlock, initialPos, size);
-			if(lengthOldContent > finalPos)
-				System.arraycopy(oldContent.elementAt(0), finalPos, newBlock, finalPos, newSize-finalPos);
-			result.add(newBlock);
-		}
-		else{
-			byte[] firstNewBlock = new byte[BLOCK_SIZE];
-			System.arraycopy(oldContent.elementAt(0), 0, firstNewBlock, 0, initialPos);
-			System.arraycopy(content, 0, firstNewBlock, initialPos, size);
-			
-		}
-		*/
-	}
-	
-	public static Vector<byte[]> splitIntoBlocks(byte[] content, byte[] firstBlock){
-		Vector<byte[]> newContentBlocks = new Vector<byte[]>();
-		
-		if(firstBlock == null) firstBlock = new byte[0];
-		
-		if(content.length + firstBlock.length <= BLOCK_SIZE){ //caso simples 
-			byte[] newContent = new byte[content.length + firstBlock.length];
-			System.arraycopy(firstBlock,0, newContent,0, firstBlock.length);
-			System.arraycopy(content, 0, newContent, firstBlock.length, content.length);
-			newContentBlocks.add(newContent);
-			return newContentBlocks;
-		}
-		return newContentBlocks;
-		/*else {
-			byte[] newContent = new byte[BLOCK_SIZE];
-			int lengthFirstContentPart = BLOCK_SIZE - firstBlock.content.length;
-			
-			System.arraycopy(firstBlock.content,0, newContent,0, firstBlock.content.length);
-			System.arraycopy(content, 0, newContent, firstBlock.content.length, lengthFirstContentPart);
-			firstBlock.content = newContent;
-			newContentBlocks.add(firstBlock);
-			
-			int remainingBytes = content.length - lengthFirstContentPart;
-			content = Arrays.copyOfRange(content, lengthFirstContentPart -1, content.length -1);
-			
-			while(remainingBytes >= BLOCK_SIZE){
-				byte[] toPutNow = Arrays.copyOfRange(content, 0, BLOCK_SIZE-1);
-				content = Arrays.copyOfRange(content, BLOCK_SIZE-1, content.length - 1 );
-				newContentBlocks.add(new ContentBlock(toPutNow));
-			}
-			//add last block
-			if(content.length != 0){
-				newContentBlocks.add(new ContentBlock(content));
-			}
-			return newContentBlocks;
-			
-		}
-		
-		*/
 	}
 	
 	public static byte[] fillBlockWithZeros(byte[] toFill){
@@ -310,33 +154,5 @@ public class BlockManager {
 		System.arraycopy(zerosArr, 0, toReturn, toFill.length, numberOfZeros);
 		return toReturn;
 	}
-	/*
-	public static int getPosOfLastByteInBlock(ContentBlock contBlock){
-		return ((BLOCK_SIZE - contBlock.content.length) -2); 
-	}
-	
-	*/
-	public static byte[] serialize(Object obj) throws IOException {
-	    ByteArrayOutputStream out = new ByteArrayOutputStream();
-	    ObjectOutputStream os = new ObjectOutputStream(out);
-            
-	    os.writeObject(obj);
-	    byte[] outputBytes = out.toByteArray();
-	    out.close();
-            
-	    return outputBytes;
-	}
-	/*
-	public static Object deserialize(byte[] data) throws IOException, ClassNotFoundException {
-	    ByteArrayInputStream in = new ByteArrayInputStream(data);
-	    ObjectInputStream is = new ObjectInputStream(in);
-            
-	    Object outputObject = is.readObject();
-	    in.close();
-            
-	    return outputObject;
-	}*/
-	
-	
 	
 }

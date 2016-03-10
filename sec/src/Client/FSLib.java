@@ -1,7 +1,5 @@
 package Client;
 
-
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -98,6 +96,18 @@ public class FSLib {
 
 		return result;
 	}
+	
+	private static boolean VerifyContentBLock(ContentBlock block, String id) {
+		boolean result = false;
+		try {
+			String hash = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(block.content));
+			result = id.equals(hash);
+		} catch (NoSuchAlgorithmException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return result;
+	}
 
 	public static byte[] FS_init(){
 
@@ -133,21 +143,7 @@ public class FSLib {
 		byte[] contents = buffer.getContent();
 		try {
 			//get owned file from server
-			Header header = (Header) deserialize(_stub.get(ownedFileId));
-
-			//********** integrity checks **************
-
-			//verify expected pub key: the hash of the received pub key should match the id used to access the file		
-			if(!VerifyPublicKey(header.pubKey, ownedFileId)){
-				//TODO handle wrong public key
-				return;
-			}
-
-			//verify integrity of the header
-			if(!VerifySignature(header.ids, header.pubKey, header.signature)){
-				//TODO handle wrong signature
-				return;
-			}
+			Header header = getHeader(ownedFileId);
 						
 			Vector<String> ids = header.ids;
 			int totalFileSize = 0;
@@ -156,8 +152,7 @@ public class FSLib {
 			if(!ids.isEmpty()){
 				lastContent = ((ContentBlock) deserialize(_stub.get(ids.lastElement()))).content;
 				totalFileSize = BlockManager.getFileSize(header, lastContent);
-			}
-			
+			}			
 			
 			int[] posModifiedBlocks = BlockManager.getBlockIndices(pos, size);
 			int[] posBlockToPad = BlockManager.getBlockIndicesToPad(pos+size-1, totalFileSize);
@@ -182,7 +177,7 @@ public class FSLib {
 			
 			if(newContents.isEmpty()){ //there was no padding
 				if(!ids.isEmpty()){
-					firstLastOriginalBlocks = new Pair<byte[],byte[]>(((ContentBlock) deserialize(_stub.get(ids.get(posModifiedBlocks[0])))).content,((ContentBlock) deserialize(_stub.get(ids.get(posModifiedBlocks[posModifiedBlocks.length -1])))).content);
+					firstLastOriginalBlocks = new Pair<byte[],byte[]>(getContentBlock(ids.get(posModifiedBlocks[0])).content,getContentBlock(ids.get(posModifiedBlocks[posModifiedBlocks.length -1])).content);
 				}
 				else{
 					firstLastOriginalBlocks = new Pair<byte[],byte[]>(new byte[contents.length],new byte[contents.length]);
@@ -225,8 +220,6 @@ public class FSLib {
 		
 			_stub.put_k(ids, Sign(ids), keyPair.getPublic());
 			
-		
-
 		} catch (ClassNotFoundException | IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -237,38 +230,8 @@ public class FSLib {
 	public static int FS_read(String id, int pos, int size, Buffer buffer ){
 		try {
 
-			Header header = (Header) deserialize(_stub.get(id));
-
-			//********** integrity checks **************
-
-			//verify expected pub key: the hash of the received pub key should match the id used to access the file		
-			if(!VerifyPublicKey(header.pubKey, id)){
-				//TODO handle wrong public key
-				return -1;
-			}
-
-			//verify integrity of the header
-			if(!VerifySignature(header.ids, header.pubKey, header.signature)){
-				//TODO handle wrong signature
-				return -1;
-			}
-
-			//TODO read the corresponding bytes
-			//current implementation reads all bytes from all blocks
-			//?????????? TODO check integrity of each block read ??????????????
-			
-			// *** pseudo-code ****
-			/* 
-			 *  vector<string> ids = vector of ids of the content block of the file
-			 *  vector<int> ind_blocks_to_read = vector of relative positions of the blocks to be read
-			 *  Vector<byte[]> blocks_to_read;
-			 *  foreach(string id : ind_blocks_to_read){
-			 *  	 blocks_to_read.add(get(ids[id]))
-			 *  }
-			 *  			 * 
-			 *  byte[size] read_bytes = read_blocks(blocks_to_read, pos, size)
-			 *  return read_bytes.length
-			 */
+			//get header from server
+			Header header = getHeader(id);
 			
 			int currentBlockBeingRead = BlockManager.getBlockByPos(pos);
 			
@@ -310,18 +273,7 @@ public class FSLib {
 				bytesRead += bytesToBeRead - bytesRead;
 			}
 			
-			buffer.setContent(readBytes);
-			
-			
-			/* SIMPLE CODE THAT READS ALL CONTENTS OF A FILE 
-			int count = 1;
-			for(String blockId : header.ids){
-				ContentBlock block = (ContentBlock) deserialize(_stub.get(blockId));
-				System.out.println("block " + count++ + ":\n" + new String(block.content));
-			}
-			*/
-			//END
-
+			buffer.setContent(readBytes);			
 			return bytesRead;
 		} catch (RemoteException e) {
 			// TODO Auto-generated catch block
@@ -337,7 +289,56 @@ public class FSLib {
 
 	}
 
+	//method for retrieving an header from the server that performs integrity checks
+	public static Header getHeader(String id){
+		Header header = null;
+		
+		try {
+			header = (Header) deserialize(_stub.get(id));
+		} catch (ClassNotFoundException | IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 
+		/********** integrity checks **************/
+
+		//verify expected pub key: the hash of the received pub key should match the id used to access the file		
+		if(!VerifyPublicKey(header.pubKey, id)){
+			//TODO handle wrong public key
+			return null;
+		}
+
+		//verify integrity of the header
+		if(!VerifySignature(header.ids, header.pubKey, header.signature)){
+			//TODO handle wrong signature
+			return null;
+		}
+		
+		return header;
+	}
+	
+	public static ContentBlock getContentBlock(String id){
+		ContentBlock block = null;
+	
+			try {
+				block = (ContentBlock) deserialize(_stub.get(id));
+			} catch (ClassNotFoundException | IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}			
+			
+		/********** integrity checks **************/
+
+		//verify received block: the hash of the received block should match the id used to access it	
+		if(!VerifyContentBLock(block, id)){
+			//TODO handle wrong content block
+			return null;
+		}
+		
+		return block;
+	}
+
+	//TODO parse input better (the content saved in buffer does not allow for spaces)
 	public static void manageInput(String choice) {
 		String[] splited = choice.split(" "); 
 		switch(splited[0]){
@@ -357,6 +358,8 @@ public class FSLib {
 			newBuffer2.setContent(splited[3].getBytes());
 			FSLib.FS_write(Integer.parseInt(splited[1]),Integer.parseInt(splited[2]),newBuffer2);
 			break;
+		case "dread":
+			FSLib.debugRead(splited[1]);
 		case "help":
 		default:
 			System.out.println("Available Commands:");
@@ -386,6 +389,19 @@ public class FSLib {
 		in.close();
 
 		return outputObject;
+	}
+	
+	public static void debugRead(String id){
+		
+		//get header from server
+		Header header = getHeader(id);
+		
+		int count = 0;
+		for(String blockId : header.ids){
+			ContentBlock block = getContentBlock(blockId);
+			System.out.println("block " + count++ + ":\n" + new String(block.content));
+		}
+		
 	}
 
 }
