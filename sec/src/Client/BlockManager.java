@@ -50,13 +50,29 @@ public class BlockManager {
 		return result;
 	}
 	
+	
 	public static int[] getBlockIndicesToPad(int pos, int totalSize){
+		
+		
+		//file was not yet created
+		if(totalSize == 0){
+			int lastBlockToPad = getBlockByPos(pos);
+			int numBlocks = lastBlockToPad + 1;
+			int[] result = new int[numBlocks];
+			for(int i = 0; i < numBlocks; i++){
+				result[i] = i;	
+			}
+			return result;
+		} //TODO create the else (code below but with less checks)
+		
 		int lastWrittenBlock = getBlockByPos(totalSize - 1);
 		int lastBlockToPad = getBlockByPos(pos);
 		int numBlocks = 0;
 		int relativePos = pos % BLOCK_SIZE;
 		int relativeEnd = (totalSize - 1 )% BLOCK_SIZE;
 		if(relativeEnd == -1) relativeEnd = 2;
+		
+		if(lastWrittenBlock == -1) lastWrittenBlock = 0;
 		
 		if(lastBlockToPad > lastWrittenBlock){
 			numBlocks += lastBlockToPad - lastWrittenBlock;	
@@ -90,8 +106,7 @@ public class BlockManager {
 			
 			System.out.println("need more blocks");
 			
-			if(curLastBlockContent.length % BLOCK_SIZE != 0)
-				result.add(fillBlockWithZeros(curLastBlockContent)); //// fills last block with zeros
+			result.add(fillBlockWithZeros(curLastBlockContent)); //// fills last block with zeros
 			
 			int offsetBlocks = lastBlockToWrite - existingBlocks - 1;
 			

@@ -195,9 +195,13 @@ public class FSLib {
 					newContents.add(firstLastOriginalBlocks.getKey());
 					ids.add(BlockManager.hashEmpty);
 				}
-			}else{
+			}else{ // there was padding
 				byte[] firstBlock = null;
-				if(posModifiedBlocks[0] >= posBlockToPad[0]){
+				
+				if(posModifiedBlocks[0] == posBlockToPad[0]){ //first block to modify is beyond the EOF and same block
+					firstBlock = newContents.get(0);
+				 
+				}else if(posModifiedBlocks[0] > posBlockToPad[0]){ //first block to modify is beyond the EOF and another block
 					int i = 0;
 					for(int aux : posBlockToPad){
 						if(posModifiedBlocks[0] == aux){
@@ -206,8 +210,8 @@ public class FSLib {
 						}
 						i++;
 					}
-					 
-				}else{
+					ids.set(posBlockToPad[0], _stub.put_h(newContents.get(0)));
+				}else { //first block to modify is before EOF	
 					firstBlock = ((ContentBlock) deserialize(_stub.get(ids.get(posModifiedBlocks[0])))).content;
 				}
 				firstLastOriginalBlocks = new Pair<byte[],byte[]>(firstBlock,newContents.lastElement());
