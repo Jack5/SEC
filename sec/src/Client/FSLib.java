@@ -8,7 +8,6 @@ import java.io.ObjectOutputStream;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
@@ -17,15 +16,17 @@ import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
-import java.util.Arrays;
 import java.util.Base64;
 import java.util.Vector;
 
+
+import Exceptions.InvalidContentException;
+import Exceptions.InvalidSignatureException;
+import Exceptions.InvalidKeyException;
 import Server.ContentBlock;
 import Server.Header;
 import Server.SecureFSInterface;
 import javafx.util.Pair;
-import jdk.nashorn.internal.ir.BlockStatement;
 
 public class FSLib {
 
@@ -58,9 +59,6 @@ public class FSLib {
 			serialized = serialize(ids);
 			sigSigner.update(serialized);
 			signed = sigSigner.sign();
-		} catch (InvalidKeyException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		} catch (NoSuchAlgorithmException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -68,6 +66,9 @@ public class FSLib {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (java.security.InvalidKeyException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
@@ -84,10 +85,13 @@ public class FSLib {
 			sigVerify.initVerify(key);
 			sigVerify.update(serialize(data));
 			result = sigVerify.verify(signature);					
-		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e1) {
+		} catch (NoSuchAlgorithmException | SignatureException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (java.security.InvalidKeyException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}		
@@ -150,7 +154,7 @@ public class FSLib {
 
 	}
 
-	public static void FS_write(int pos, int size,Buffer buffer) {	
+	public static void FS_write(int pos, int size,Buffer buffer) throws InvalidKeyException, InvalidSignatureException, InvalidContentException {	
 		byte[] contents = buffer.getContent();
 		try {
 			//get owned file from server
@@ -161,7 +165,7 @@ public class FSLib {
 			byte[] lastContent = null;
 			
 			if(!ids.isEmpty()){
-				lastContent = ((ContentBlock) deserialize(_stub.get(ids.lastElement()))).content;
+				lastContent = getContentBlock(ids.lastElement()).content;
 				totalFileSize = BlockManager.getFileSize(header, lastContent);
 			}			
 			
@@ -212,7 +216,7 @@ public class FSLib {
 					}
 					ids.set(posBlockToPad[0], _stub.put_h(newContents.get(0)));
 				}else { //first block to modify is before EOF	
-					firstBlock = ((ContentBlock) deserialize(_stub.get(ids.get(posModifiedBlocks[0])))).content;
+					firstBlock = getContentBlock(ids.get(posModifiedBlocks[0])).content;
 				}
 				firstLastOriginalBlocks = new Pair<byte[],byte[]>(firstBlock,newContents.lastElement());
 			}
@@ -230,77 +234,64 @@ public class FSLib {
 		
 			_stub.put_k(ids, Sign(ids), keyPair.getPublic());
 			
-		} catch (ClassNotFoundException | IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
-	}
-
-	public static int FS_read(String id, int pos, int size, Buffer buffer ){
-		try {
-
-			//get header from server
-			Header header = getHeader(id);
-			
-			int currentBlockBeingRead = BlockManager.getBlockByPos(pos);
-			
-			if(currentBlockBeingRead > header.ids.size() - 1){
-				System.out.println("Initial Pos exceeds EOF!");
-				return 0;
-			}
-			
-			if(currentBlockBeingRead == header.ids.size() -1 && pos%BlockManager.BLOCK_SIZE > header.ids.lastElement().length()){
-				System.out.println("Initial Pos exceeds EOF!");
-				return 0;
-			}
-			
-			
-			
-			int bytesRead = 0 ;
-			
-			int totalFileSize = BlockManager.getFileSize(header, ((ContentBlock) deserialize(_stub.get(header.ids.lastElement()))).content);
-			int bytesToBeRead = Math.min(totalFileSize - pos , size);
-			int lastBlockToRead = BlockManager.getBlockByPos(pos + bytesToBeRead - 1);
-			byte[] readBytes = new byte[bytesToBeRead];
-			
-			//Read Routines
-			byte[] curBlock = ((ContentBlock) deserialize(_stub.get(header.ids.get(currentBlockBeingRead)))).content;
-			int bytesToReadInFirstBlock = Math.min( curBlock.length - (pos % BlockManager.BLOCK_SIZE), size);
-			System.arraycopy(curBlock, pos % BlockManager.BLOCK_SIZE, readBytes, bytesRead, bytesToReadInFirstBlock);
-			bytesRead += bytesToReadInFirstBlock;
-			currentBlockBeingRead++;
-			
-			for(; currentBlockBeingRead < lastBlockToRead ; currentBlockBeingRead++){
-				curBlock = ((ContentBlock) deserialize(_stub.get(header.ids.get(currentBlockBeingRead)))).content;
-				System.arraycopy(curBlock, 0, readBytes, bytesRead, BlockManager.BLOCK_SIZE);
-				bytesRead += BlockManager.BLOCK_SIZE;
-			}
-			
-			if(currentBlockBeingRead == lastBlockToRead){
-				curBlock = ((ContentBlock) deserialize(_stub.get(header.ids.get(currentBlockBeingRead)))).content;
-				System.arraycopy(curBlock, 0, readBytes, bytesRead, bytesToBeRead - bytesRead);
-				bytesRead += bytesToBeRead - bytesRead;
-			}
-			
-			buffer.setContent(readBytes);			
-			return bytesRead;
-		} catch (RemoteException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		return 0;
+
+	}
+
+	public static int FS_read(String id, int pos, int size, Buffer buffer ) throws InvalidKeyException, InvalidSignatureException, InvalidContentException{
+		//get header from server
+		Header header = getHeader(id);
+		
+		int currentBlockBeingRead = BlockManager.getBlockByPos(pos);
+		
+		if(currentBlockBeingRead > header.ids.size() - 1){
+			System.out.println("Initial Pos exceeds EOF!");
+			return 0;
+		}
+		
+		if(currentBlockBeingRead == header.ids.size() -1 && pos%BlockManager.BLOCK_SIZE > header.ids.lastElement().length()){
+			System.out.println("Initial Pos exceeds EOF!");
+			return 0;
+		}
+		
+		
+		
+		int bytesRead = 0 ;
+		
+		int totalFileSize = BlockManager.getFileSize(header, getContentBlock(header.ids.lastElement()).content);
+		int bytesToBeRead = Math.min(totalFileSize - pos , size);
+		int lastBlockToRead = BlockManager.getBlockByPos(pos + bytesToBeRead - 1);
+		byte[] readBytes = new byte[bytesToBeRead];
+		
+		//Read Routines
+		byte[] curBlock =  getContentBlock(header.ids.get(currentBlockBeingRead)).content;
+		int bytesToReadInFirstBlock = Math.min( curBlock.length - (pos % BlockManager.BLOCK_SIZE), size);
+		System.arraycopy(curBlock, pos % BlockManager.BLOCK_SIZE, readBytes, bytesRead, bytesToReadInFirstBlock);
+		bytesRead += bytesToReadInFirstBlock;
+		currentBlockBeingRead++;
+		
+		for(; currentBlockBeingRead < lastBlockToRead ; currentBlockBeingRead++){
+			curBlock = getContentBlock(header.ids.get(currentBlockBeingRead)).content;
+			System.arraycopy(curBlock, 0, readBytes, bytesRead, BlockManager.BLOCK_SIZE);
+			bytesRead += BlockManager.BLOCK_SIZE;
+		}
+		
+		if(currentBlockBeingRead == lastBlockToRead){
+			curBlock = getContentBlock(header.ids.get(currentBlockBeingRead)).content;
+			System.arraycopy(curBlock, 0, readBytes, bytesRead, bytesToBeRead - bytesRead);
+			bytesRead += bytesToBeRead - bytesRead;
+		}
+		
+		buffer.setContent(readBytes);			
+		return bytesRead;
 
 	}
 
 	//method for retrieving an header from the server that performs integrity checks
-	public static Header getHeader(String id){
+	public static Header getHeader(String id) throws InvalidKeyException, InvalidSignatureException{
 		Header header = null;
 		
 		try {
@@ -314,20 +305,18 @@ public class FSLib {
 
 		//verify expected pub key: the hash of the received pub key should match the id used to access the file		
 		if(!VerifyPublicKey(header.pubKey, id)){
-			//TODO handle wrong public key
-			return null;
+			throw new InvalidKeyException();
 		}
 
 		//verify integrity of the header
 		if(!VerifySignature(header.ids, header.pubKey, header.signature)){
-			//TODO handle wrong signature
-			return null;
+			throw new InvalidSignatureException();
 		}
 		
 		return header;
 	}
 	
-	public static ContentBlock getContentBlock(String id){
+	public static ContentBlock getContentBlock(String id) throws InvalidContentException{
 		ContentBlock block = null;
 	
 			try {
@@ -335,21 +324,20 @@ public class FSLib {
 			} catch (ClassNotFoundException | IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-			}			
+			}	
 			
 		/********** integrity checks **************/
 
 		//verify received block: the hash of the received block should match the id used to access it	
 		if(!VerifyContentBLock(block, id)){
-			//TODO handle wrong content block
-			return null;
+			throw new InvalidContentException();
 		}
 		
 		return block;
 	}
 
 	//TODO parse input better (the content saved in buffer does not allow for spaces)
-	public static void manageInput(String choice) {
+	public static void manageInput(String choice) throws InvalidKeyException, NumberFormatException, InvalidSignatureException, InvalidContentException {
 		String[] splited = choice.split(" "); 
 		switch(splited[0]){
 		case "init":
@@ -402,7 +390,7 @@ public class FSLib {
 		return outputObject;
 	}
 	
-	public static void debugRead(){
+	public static void debugRead() throws InvalidKeyException, InvalidSignatureException, InvalidContentException{
 		
 		//get header from server
 		Header header = getHeader(ownedFileId);
@@ -413,6 +401,56 @@ public class FSLib {
 			System.out.println("block " + count++ + ":\n" + new String(block.content));
 		}
 		
+	}
+	
+
+	public static void changeIdVector(int pos, String fakeId, String headerToChange){
+		try {
+			_stub.changeIdVector(pos, fakeId, headerToChange);
+		} catch (RemoteException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	public static void changeSignedHash(byte[] fakeSigned, String headerToChange){
+		try {
+			_stub.changeSignedHash(fakeSigned, headerToChange);
+		} catch (RemoteException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	public static void changePublicKey(PublicKey fakePubKey, String headerToChange){
+		try {
+			_stub.changePublicKey(fakePubKey, headerToChange);
+		} catch (RemoteException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	public static void changeContentBlock(byte[] fakeContent, String contentBlockToChange){
+		try {
+			
+			
+			
+			_stub.changeContentBlock(fakeContent, contentBlockToChange);
+		} catch (RemoteException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	public static Vector<String> getCBIdsFromHeader(String headerId){
+		try {
+			return _stub.getCBIdsFromHeader(headerId);
+		} catch (RemoteException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return null;
 	}
 
 }

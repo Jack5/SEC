@@ -104,7 +104,7 @@ public class BlockManager {
 		if(existingBlocks == -1) existingBlocks = 0;
 		if(existingBlocks < lastBlockToWrite){ //são necessários mais blocos
 			
-			System.out.println("need more blocks");
+			
 			
 			result.add(fillBlockWithZeros(curLastBlockContent)); //// fills last block with zeros
 			
@@ -112,11 +112,11 @@ public class BlockManager {
 			
 			//creates full blocks of 0s between the first and last block to pad
 			for(;offsetBlocks > 0;offsetBlocks--){
-				System.out.println("add empty block");
+				
 				result.add(emptyBlock);
 			}
 			//fills last block with 0s until the pos	
-				System.out.println("final block");
+				
 				String hash = null;
 				result.add(new byte[posInBlockCoords+1]);		
 			

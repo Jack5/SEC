@@ -24,7 +24,32 @@ import java.util.Vector;
 
 public class SecureFSImplementation extends UnicastRemoteObject implements SecureFSInterface {
 
+	//test methods
+	@Override
+	public  void changeIdVector(int pos, String fakeId, String headerToChange)throws RemoteException{
+		headerBlocks.get(headerToChange).ids.set(pos, fakeId);
+	}
+	@Override
+	public  void changeSignedHash(byte[] fakeSigned, String headerToChange)throws RemoteException{
+		headerBlocks.get(headerToChange).signature = fakeSigned;
+	}
+	@Override
+	public  void changePublicKey(PublicKey fakePubKey, String headerToChange)throws RemoteException{
+		headerBlocks.get(headerToChange).pubKey = fakePubKey;
+	}
+	@Override
+	public  void changeContentBlock(byte[] fakeContent, String contentBlockToChange)throws RemoteException{
+		contentBlocks.get(contentBlockToChange).content = fakeContent;
+	}
+	@Override
+	public  Vector<String> getCBIdsFromHeader(String headerId)throws RemoteException{
+		return headerBlocks.get(headerId).ids;
+	}
+	
 
+	////////////////////////
+	
+	
 	/**
 	 * 
 	 */
@@ -50,7 +75,6 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 	@Override
 	public byte[] get(String id) throws RemoteException {
 				
-		System.out.println("get: " + id);
 		
 		byte[] toSend = null;
 

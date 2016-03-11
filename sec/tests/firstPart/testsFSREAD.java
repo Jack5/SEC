@@ -2,9 +2,13 @@ package firstPart;
 
 import Client.Buffer;
 import Client.FSLib;
+import Exceptions.InvalidContentException;
+import Exceptions.InvalidSignatureException;
 import junit.framework.TestCase;
 
 import static org.junit.Assert.*;
+
+import java.security.InvalidKeyException;
 
 import org.junit.*;
 
@@ -17,7 +21,7 @@ public class testsFSREAD extends TestCase {
 	boolean ffs = false;
 	
 	@Before
-	public void initialize(){
+	public void initialize() throws InvalidSignatureException, InvalidContentException, Exceptions.InvalidKeyException{
 		FSLib.FS_init();
 		
 		id = FSLib.getId();
@@ -32,10 +36,30 @@ public class testsFSREAD extends TestCase {
 	@Test
 	public void testCorrectRead(){
 		if(!ffs){
-			initialize();
+			try {
+				initialize();
+			} catch (InvalidSignatureException | InvalidContentException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (Exceptions.InvalidKeyException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 		Buffer result = new Buffer();
-		int numberOfBytesRead = FSLib.FS_read(id, 0, 5, result);
+		int numberOfBytesRead = 0;
+		try {
+			numberOfBytesRead = FSLib.FS_read(id, 0, 5, result);
+		} catch (InvalidSignatureException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (Exceptions.InvalidKeyException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InvalidContentException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		
 		String textFrag = new String(text.substring(0,5));
 		assertEquals(numberOfBytesRead, 5);
@@ -45,11 +69,31 @@ public class testsFSREAD extends TestCase {
 	@Test
 	public void testReadBegginingBeyondLimits(){
 		if(!ffs){
-			initialize();
+			try {
+				initialize();
+			} catch (InvalidSignatureException | InvalidContentException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (Exceptions.InvalidKeyException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 		Buffer result = new Buffer();
 		
-		int numberOfBytesRead = FSLib.FS_read(id, 900000000, 90000000, result);
+		int numberOfBytesRead = 0;
+		try {
+			numberOfBytesRead = FSLib.FS_read(id, 900000000, 90000000, result);
+		} catch (InvalidSignatureException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (Exceptions.InvalidKeyException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InvalidContentException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		assertEquals(null,result.getContent());
 		assertEquals(numberOfBytesRead,0);
 		
@@ -58,11 +102,30 @@ public class testsFSREAD extends TestCase {
 	@Test
 	public void testReadBeyondEOF(){
 		if(!ffs){
-			initialize();
+			try {
+				initialize();
+			} catch (InvalidSignatureException | InvalidContentException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (Exceptions.InvalidKeyException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 		Buffer result = new Buffer();
-		System.out.println(id);
-		int numberOfBytesRead = FSLib.FS_read(id, 0, 90000000, result);
+		int numberOfBytesRead = 0;
+		try {
+			numberOfBytesRead = FSLib.FS_read(id, 0, 90000000, result);
+		} catch (InvalidSignatureException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (Exceptions.InvalidKeyException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InvalidContentException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		
 		
 		assertEquals(new String(result.getContent()),text);
