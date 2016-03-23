@@ -1,7 +1,5 @@
 package Server;
 
-import java.rmi.registry.Registry;
-import java.rmi.registry.LocateRegistry;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -9,18 +7,24 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
 import java.security.InvalidKeyException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.security.cert.Certificate;
 import java.util.Base64;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Vector;
+
+import javafx.util.Pair;
 
 public class SecureFSImplementation extends UnicastRemoteObject implements SecureFSInterface {
 
@@ -45,18 +49,19 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 	public  Vector<String> getCBIdsFromHeader(String headerId)throws RemoteException{
 		return headerBlocks.get(headerId).ids;
 	}
-	
+
 
 	////////////////////////
-	
-	
+
+
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = 7987182049922996428L;
 	static Map<String, Header> headerBlocks= new HashMap<String,Header>();
 	static Map<String, ContentBlock> contentBlocks = new HashMap<String, ContentBlock>();
-
+	private static KeyStore keyStore;
+	
 	public SecureFSImplementation() throws RemoteException {}
 
 	public static void main(String args[]) {
@@ -65,6 +70,14 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 			LocateRegistry.createRegistry(1099);
 			SecureFSImplementation server = new SecureFSImplementation();
 			Naming.rebind("fs.Server", server);
+
+			//load keystore
+			keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+
+		    // get user password and file input stream
+		    char[] password = "password".toCharArray();
+		    keyStore.load(null, password);
+
 			System.err.println("Server ready");
 		} catch (Exception e) {
 			System.err.println("Server exception: " + e.toString());
@@ -73,9 +86,40 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 	}
 
 	@Override
-	public byte[] get(String id) throws RemoteException {
-				
+	public boolean storePubKey(Certificate cert, String userName) throws RemoteException{
+		boolean result = false;
+		try {
+			keyStore.setCertificateEntry(userName, cert);
+			result = true;
+		} catch (KeyStoreException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return result;		
+	}
+	
+	@Override
+	public Vector<Pair<String, Certificate>> readPubKeys() throws RemoteException{
+		Vector<Pair<String, Certificate>> result = new Vector<Pair<String, Certificate>>();
+		try {
+			Enumeration<String> aliases = keyStore.aliases();
+			while(aliases.hasMoreElements()){
+				String alias = aliases.nextElement();
+				Pair<String, Certificate> pair = new Pair<String, Certificate>(alias, keyStore.getCertificate(alias));
+				result.add(pair);
+			}
+		} catch (KeyStoreException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		
+		return result;
+	}
+	
+	@Override
+	public byte[] get(String id) throws RemoteException {
+
+
 		byte[] toSend = null;
 
 		try {
@@ -94,7 +138,7 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 
 	@Override
 	public String put_k(Vector<String> data, byte[] signed, PublicKey pubKey) throws RemoteException {
-		
+
 		String id ;
 
 		//Generate ID = hash of public key
@@ -104,7 +148,7 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 			e1.printStackTrace();
 			throw new RemoteException("Internal Error");
 		}
-		
+
 		System.out.println("put_k: " + id);
 
 		//Verify received data to be that which was signed
@@ -139,7 +183,7 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 			ContentBlock newContent = new ContentBlock(data);
 			String hash = 	Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(data));
 			contentBlocks.put(hash, newContent);
-			
+
 			System.out.println("put_h: " + hash);
 			return hash;
 		} catch (NoSuchAlgorithmException e) {

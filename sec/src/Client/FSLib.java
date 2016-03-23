@@ -12,21 +12,27 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.Base64;
 import java.util.Vector;
 
-
 import Exceptions.InvalidContentException;
-import Exceptions.InvalidSignatureException;
 import Exceptions.InvalidKeyException;
+import Exceptions.InvalidSignatureException;
 import Server.ContentBlock;
+import Server.CCLogic;
 import Server.Header;
 import Server.SecureFSInterface;
 import javafx.util.Pair;
+import sun.security.tools.keytool.CertAndKeyGen;
+import sun.security.x509.X500Name;
 
 public class FSLib {
 
@@ -132,12 +138,13 @@ public class FSLib {
 			_stub = (SecureFSInterface) registry.lookup("fs.Server");
 			System.out.println("connected");
 
-			//generate key pair
+		/*	//generate key pair
 			KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
 			SecureRandom secRand = SecureRandom.getInstanceStrong();
 			keyGen.initialize(2048, secRand);
 			keyPair = keyGen.generateKeyPair();		    
-
+*/
+			
 			//empty vector of ids for an uninitialized file
 			Vector<String> emptyIds = new Vector<String>();
 
@@ -358,6 +365,39 @@ public class FSLib {
 			break;
 		case "dread":
 			FSLib.debugRead();
+			break;
+		case "storepk":			
+			CertAndKeyGen certGen;
+			try {
+				// generate the certificate
+				// first parameter  = Algorithm
+				// second parameter = signrature algorithm
+				// third parameter  = the provider to use to generate the keys (may be null or
+				//				                    use the constructor without provider)
+				certGen = new CertAndKeyGen("RSA", "SHA256WithRSA", null);
+				// generate it with 2048 bits
+				certGen.generate(2048);
+				// prepare the validity of the certificate
+				long validSecs = (long) 365 * 24 * 60 * 60; // valid for one year
+				// add the certificate information, currently only valid for one year.
+				X509Certificate cert = certGen.getSelfCertificate(
+				   // enter your details according to your application
+				   new X500Name("CN=My Application,O=My Organisation,L=My City,C=DE"), validSecs);
+				_stub.storePubKey(cert, splited[1]);
+			} catch (NoSuchAlgorithmException | NoSuchProviderException | java.security.InvalidKeyException | CertificateException | SignatureException | IOException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+			break;
+		case "readpk":
+			try {
+				for(Pair<String, Certificate> p : _stub.readPubKeys()){
+					System.out.println("user |" + p.getKey() + "| has certificate: " + p.getValue().toString());
+				}
+			} catch (RemoteException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			break;
 		case "help":
 		default:
