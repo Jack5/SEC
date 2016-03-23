@@ -41,6 +41,7 @@ public class FSLib {
 
 	static KeyPair keyPair;
 	static String ownedFileId;
+	static X509Certificate cert;
 	
 
 	//methods for test purposes
@@ -53,7 +54,7 @@ public class FSLib {
 	}
 	
 
-	
+	/*
 	////////////////////////////
 	//method for signing the contents of an header
 	private static byte[] Sign(Vector<String> ids){
@@ -61,6 +62,7 @@ public class FSLib {
 		byte[] signed = null;
 		try {
 			Signature sigSigner  = Signature.getInstance("SHA256withRSA");
+			//sigSigner.initSign(keyPair.getPrivate());
 			sigSigner.initSign(keyPair.getPrivate());
 			serialized = serialize(ids);
 			sigSigner.update(serialized);
@@ -80,7 +82,8 @@ public class FSLib {
 		}
 		return signed;
 	}
-
+*/
+	
 	//method for verifying the signature of an header
 	private static boolean VerifySignature(Vector<String> data, PublicKey key, byte[] signature){
 		//Verify received data to be that which was signed
@@ -138,18 +141,19 @@ public class FSLib {
 			_stub = (SecureFSInterface) registry.lookup("fs.Server");
 			System.out.println("connected");
 
-		/*	//generate key pair
-			KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
-			SecureRandom secRand = SecureRandom.getInstanceStrong();
-			keyGen.initialize(2048, secRand);
-			keyPair = keyGen.generateKeyPair();		    
-*/
+			//init CC
+			CCLogic.init();
+			
+			//get certificate from CC
+			cert = CCLogic.getCertificate();
+			String cardNumber = CCLogic.getCardNumber();
+			_stub.storePubKey(cert, cardNumber);
 			
 			//empty vector of ids for an uninitialized file
 			Vector<String> emptyIds = new Vector<String>();
 
 			//server call
-			ownedFileId =_stub.put_k(emptyIds, Sign(emptyIds), keyPair.getPublic());
+			ownedFileId =_stub.put_k(emptyIds, CCLogic.Sign(serialize(emptyIds)), cert.getPublicKey());
 
 			System.out.println("ID associated with this user is:\n" + ownedFileId);
 			BlockManager.hashEmptyBlock(_stub);
@@ -238,8 +242,8 @@ public class FSLib {
 				ids.set(index, _stub.put_h(finalForm));
 				index++;		
 			}
-		
-			_stub.put_k(ids, Sign(ids), keyPair.getPublic());
+
+			_stub.put_k(ids, CCLogic.Sign(serialize(ids)), cert.getPublicKey());
 			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
