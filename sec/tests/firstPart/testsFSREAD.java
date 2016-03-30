@@ -4,6 +4,7 @@ import Client.Buffer;
 import Client.FSLib;
 import Exceptions.InvalidContentException;
 import Exceptions.InvalidSignatureException;
+import Exceptions.WrongStorageException;
 import junit.framework.TestCase;
 
 import static org.junit.Assert.*;
@@ -21,7 +22,7 @@ public class testsFSREAD extends TestCase {
 	boolean ffs = false;
 	
 	@Before
-	public void initialize() throws InvalidSignatureException, InvalidContentException, Exceptions.InvalidKeyException{
+	public void initialize() throws InvalidSignatureException, InvalidContentException, Exceptions.InvalidKeyException, WrongStorageException{
 		FSLib.FS_init();
 		
 		id = FSLib.getId();
@@ -42,6 +43,9 @@ public class testsFSREAD extends TestCase {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			} catch (Exceptions.InvalidKeyException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (WrongStorageException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
@@ -77,6 +81,9 @@ public class testsFSREAD extends TestCase {
 			} catch (Exceptions.InvalidKeyException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
+			} catch (WrongStorageException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
 		}
 		Buffer result = new Buffer();
@@ -108,6 +115,9 @@ public class testsFSREAD extends TestCase {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			} catch (Exceptions.InvalidKeyException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (WrongStorageException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}

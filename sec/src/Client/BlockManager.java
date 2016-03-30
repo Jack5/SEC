@@ -1,14 +1,9 @@
 package Client;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.util.Arrays;
 import java.util.Vector;
 
-import Server.ContentBlock;
 import Server.Header;
 import Server.SecureFSInterface;
 import javafx.util.Pair;
@@ -117,7 +112,6 @@ public class BlockManager {
 			}
 			//fills last block with 0s until the pos	
 				
-				String hash = null;
 				result.add(new byte[posInBlockCoords+1]);		
 			
 		}else { //vamos escrever num bloco que já existe
@@ -133,7 +127,6 @@ public class BlockManager {
 	
 	public static Vector<byte[]> newBlocks(Pair<byte[],byte[]> oldContent, int pos, byte[] content, int nrBlocksModified){
 		int initialPos = pos % BLOCK_SIZE;
-		int finalPos = (pos+content.length) % BLOCK_SIZE; 	
 		Vector<byte[]> result = new Vector<byte[]>();
 
 		if(nrBlocksModified == 1){

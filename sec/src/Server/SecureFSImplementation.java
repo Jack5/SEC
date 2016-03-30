@@ -2,6 +2,7 @@ package Server;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -9,19 +10,33 @@ import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.security.cert.CertPath;
+import java.security.cert.CertPathValidator;
+import java.security.cert.CertPathValidatorException;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.PKIXCertPathValidatorResult;
+import java.security.cert.PKIXParameters;
+import java.security.cert.TrustAnchor;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.Vector;
 
 import javafx.util.Pair;
@@ -61,7 +76,7 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 	static Map<String, Header> headerBlocks= new HashMap<String,Header>();
 	static Map<String, ContentBlock> contentBlocks = new HashMap<String, ContentBlock>();
 	private static KeyStore keyStore;
-	
+
 	public SecureFSImplementation() throws RemoteException {}
 
 	public static void main(String args[]) {
@@ -74,9 +89,9 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 			//load keystore
 			keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
 
-		    // get user password and file input stream
-		    char[] password = "password".toCharArray();
-		    keyStore.load(null, password);
+			// get user password and file input stream
+			char[] password = "password".toCharArray();
+			keyStore.load(null, password);
 
 			System.err.println("Server ready");
 		} catch (Exception e) {
@@ -88,6 +103,7 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 	@Override
 	public boolean storePubKey(Certificate cert, String userName) throws RemoteException{
 		boolean result = false;
+
 		try {
 			keyStore.setCertificateEntry(userName, cert);
 			result = true;
@@ -97,7 +113,7 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 		}
 		return result;		
 	}
-	
+
 	@Override
 	public Vector<Pair<String, Certificate>> readPubKeys() throws RemoteException{
 		Vector<Pair<String, Certificate>> result = new Vector<Pair<String, Certificate>>();
@@ -112,10 +128,10 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
+
 		return result;
 	}
-	
+
 	@Override
 	public byte[] get(String id) throws RemoteException {
 
@@ -141,7 +157,7 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 
 		String id ;
 
-		//Generate ID = hash of public key
+		//Generate ID = hash of public  key
 		try {
 			id = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(pubKey.toString().getBytes()));
 		} catch (NoSuchAlgorithmException e1) {
@@ -154,7 +170,7 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 		//Verify received data to be that which was signed
 		try {
 			Signature sigVerify;
-			sigVerify = Signature.getInstance("SHA256withRSA");
+			sigVerify = Signature.getInstance("SHA1withRSA");
 			sigVerify.initVerify(pubKey);
 			sigVerify.update(serialize(data));
 			boolean result = sigVerify.verify(signed);
