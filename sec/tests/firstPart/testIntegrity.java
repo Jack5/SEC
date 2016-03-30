@@ -15,12 +15,13 @@ import Client.Buffer;
 import Client.FSLib;
 import Exceptions.InvalidContentException;
 import Exceptions.InvalidSignatureException;
+import Exceptions.WrongStorageException;
 public class testIntegrity extends TestCase{
 	
 	String id = null;
 	
 	@Before
-	public void initialize() throws InvalidSignatureException, InvalidContentException, Exceptions.InvalidKeyException{
+	public void initialize() throws InvalidSignatureException, InvalidContentException, Exceptions.InvalidKeyException, WrongStorageException{
 		FSLib.FS_init();
 		
 		id = FSLib.getId();
@@ -36,7 +37,7 @@ public class testIntegrity extends TestCase{
 	}
 	
 	@Test(expected = InvalidSignatureException.class)
-	public void testChangeCBIdInHeader() throws InvalidSignatureException, InvalidContentException, Exceptions.InvalidKeyException {
+	public void testChangeCBIdInHeader() throws InvalidSignatureException, InvalidContentException, Exceptions.InvalidKeyException, WrongStorageException {
 		initialize();
 		boolean validTest = false;
 		FSLib.changeIdVector(0, "imFake", id);
@@ -66,6 +67,9 @@ public class testIntegrity extends TestCase{
 		} catch (Exceptions.InvalidKeyException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
+		} catch (WrongStorageException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 		boolean validTest = false;
 		FSLib.changeSignedHash(new byte[256],id);
@@ -89,7 +93,7 @@ public class testIntegrity extends TestCase{
 	}
 	
 	@Test(expected = InvalidKeyException.class)
-	public void testChangePubKeyInHeader() throws InvalidSignatureException, InvalidContentException, Exceptions.InvalidKeyException{
+	public void testChangePubKeyInHeader() throws InvalidSignatureException, InvalidContentException, Exceptions.InvalidKeyException, WrongStorageException{
 		initialize();
 		boolean isValid = false;
 		KeyPairGenerator fakePairGen = null;
@@ -127,7 +131,7 @@ public class testIntegrity extends TestCase{
 	}
 	
 	@Test(expected = InvalidContentException.class)
-	public void testChangeContentInCB() throws InvalidSignatureException, Exceptions.InvalidKeyException, InvalidContentException{
+	public void testChangeContentInCB() throws InvalidSignatureException, Exceptions.InvalidKeyException, InvalidContentException, WrongStorageException{
 		initialize();
 		boolean isValid = false;
 		

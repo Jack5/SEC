@@ -2,35 +2,49 @@ package Client;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PublicKey;
-import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.security.cert.CertPath;
+import java.security.cert.CertPathValidator;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.PKIXCertPathValidatorResult;
+import java.security.cert.PKIXParameters;
+import java.security.cert.TrustAnchor;
+import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Vector;
+
 
 import Exceptions.InvalidContentException;
 import Exceptions.InvalidKeyException;
 import Exceptions.InvalidSignatureException;
-import Server.ContentBlock;
+import Exceptions.WrongStorageException;
 import Server.CCLogic;
+import Server.ContentBlock;
 import Server.Header;
 import Server.SecureFSInterface;
 import javafx.util.Pair;
+import sun.security.pkcs11.wrapper.PKCS11Exception;
 import sun.security.tools.keytool.CertAndKeyGen;
 import sun.security.x509.X500Name;
 
@@ -42,55 +56,25 @@ public class FSLib {
 	static KeyPair keyPair;
 	static String ownedFileId;
 	static X509Certificate cert;
-	
+	static ArrayList<X509Certificate> rootCerts;
 
 	//methods for test purposes
 	public static PublicKey getPubKey(){
 		return keyPair.getPublic();
 	}
-	
+
 	public static String getId(){
 		return ownedFileId;
 	}
-	
 
-	/*
-	////////////////////////////
-	//method for signing the contents of an header
-	private static byte[] Sign(Vector<String> ids){
-		byte[] serialized = null;
-		byte[] signed = null;
-		try {
-			Signature sigSigner  = Signature.getInstance("SHA256withRSA");
-			//sigSigner.initSign(keyPair.getPrivate());
-			sigSigner.initSign(keyPair.getPrivate());
-			serialized = serialize(ids);
-			sigSigner.update(serialized);
-			signed = sigSigner.sign();
-		} catch (NoSuchAlgorithmException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (SignatureException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (java.security.InvalidKeyException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		return signed;
-	}
-*/
-	
+
 	//method for verifying the signature of an header
 	private static boolean VerifySignature(Vector<String> data, PublicKey key, byte[] signature){
 		//Verify received data to be that which was signed
 		boolean result = false;
 		try {
 			Signature sigVerify;
-			sigVerify = Signature.getInstance("SHA256withRSA");
+			sigVerify = Signature.getInstance("SHA1withRSA");
 			sigVerify.initVerify(key);
 			sigVerify.update(serialize(data));
 			result = sigVerify.verify(signature);					
@@ -120,7 +104,7 @@ public class FSLib {
 
 		return result;
 	}
-	
+
 	private static boolean VerifyContentBLock(ContentBlock block, String id) {
 		boolean result = false;
 		try {
@@ -141,21 +125,45 @@ public class FSLib {
 			_stub = (SecureFSInterface) registry.lookup("fs.Server");
 			System.out.println("connected");
 
+			//load cc certificates
+			CertificateFactory cf = CertificateFactory.getInstance("X.509");
+			rootCerts = new ArrayList();
+			for(int i = 1; i < 4; i++){
+				FileInputStream in = new FileInputStream("C:\\Users\\biscoito\\SEC\\sec\\resources\\Cartao de Cidadao 00" + i + ".cer");
+				Certificate c = cf.generateCertificate(in);
+				rootCerts.add((X509Certificate) c);
+			}
+
 			//init CC
 			CCLogic.init();
-			
+
+			ArrayList<X509Certificate> certificates = new ArrayList<X509Certificate>();
+
+			certificates.add(CCLogic.getCertificate(0));
+			certificates.add(CCLogic.getCertificate(3));
+
+
+			CertPath cp = cf.generateCertPath(certificates);
+
+			HashSet<TrustAnchor> anchors = new HashSet<TrustAnchor>();
+			for(X509Certificate c : rootCerts) anchors.add(new TrustAnchor(c, null));
+			PKIXParameters params = new PKIXParameters(anchors);
+			params.setRevocationEnabled(false);
+			CertPathValidator cpv = CertPathValidator.getInstance("PKIX");
+			PKIXCertPathValidatorResult result = (PKIXCertPathValidatorResult) cpv.validate(cp, params);
+
 			//get certificate from CC
-			cert = CCLogic.getCertificate();
+			cert = CCLogic.getCertificate(0);
 			String cardNumber = CCLogic.getCardNumber();
+
 			_stub.storePubKey(cert, cardNumber);
-			
+
 			//empty vector of ids for an uninitialized file
 			Vector<String> emptyIds = new Vector<String>();
 
 			//server call
-			ownedFileId =_stub.put_k(emptyIds, CCLogic.Sign(serialize(emptyIds)), cert.getPublicKey());
+			ownedFileId =_stub.put_k(emptyIds, CCLogic.sign(serialize(emptyIds)), cert.getPublicKey());
 
-			System.out.println("ID associated with this user is:\n" + ownedFileId);
 			BlockManager.hashEmptyBlock(_stub);
 		} catch (Exception e) {
 			System.err.println("Client exception: " + e.toString());
@@ -165,42 +173,42 @@ public class FSLib {
 
 	}
 
-	public static void FS_write(int pos, int size,Buffer buffer) throws InvalidKeyException, InvalidSignatureException, InvalidContentException {	
+	public static void FS_write(int pos, int size,Buffer buffer) throws InvalidKeyException, InvalidSignatureException, InvalidContentException, WrongStorageException {	
 		byte[] contents = buffer.getContent();
 		try {
 			//get owned file from server
 			Header header = getHeader(ownedFileId);
-						
+
 			Vector<String> ids = header.ids;
 			int totalFileSize = 0;
 			byte[] lastContent = null;
-			
+
 			if(!ids.isEmpty()){
 				lastContent = getContentBlock(ids.lastElement()).content;
 				totalFileSize = BlockManager.getFileSize(header, lastContent);
 			}			
-			
+
 			int[] posModifiedBlocks = BlockManager.getBlockIndices(pos, size);
 			int[] posBlockToPad = BlockManager.getBlockIndicesToPad(pos+size-1, totalFileSize);
-			
+
 			Vector<byte[]> newContents = new Vector<byte[]>();
-			
+
 			//padding
 			if(posBlockToPad[0] != -1){	
 				newContents = BlockManager.addPadding(ids.size() - 1, posModifiedBlocks[posModifiedBlocks.length-1], lastContent, (pos+size-1)%BlockManager.BLOCK_SIZE);
-				
+
 				if(totalFileSize % BlockManager.BLOCK_SIZE == 0)
 					ids.add(BlockManager.hashEmpty);
 				else
 					ids.set(ids.size() - 1,BlockManager.hashEmpty);
 				for(int i = 1; i < newContents.size(); i++){
-				
+
 					ids.add(BlockManager.hashEmpty);	
 				}	
 			}
 
 			Pair<byte[],byte[]> firstLastOriginalBlocks = null;
-			
+
 			if(newContents.isEmpty()){ //there was no padding
 				if(!ids.isEmpty()){
 					firstLastOriginalBlocks = new Pair<byte[],byte[]>(getContentBlock(ids.get(posModifiedBlocks[0])).content,getContentBlock(ids.get(posModifiedBlocks[posModifiedBlocks.length -1])).content);
@@ -212,10 +220,10 @@ public class FSLib {
 				}
 			}else{ // there was padding
 				byte[] firstBlock = null;
-				
+
 				if(posModifiedBlocks[0] == posBlockToPad[0]){ //first block to modify is beyond the EOF and same block
 					firstBlock = newContents.get(0);
-				 
+
 				}else if(posModifiedBlocks[0] > posBlockToPad[0]){ //first block to modify is beyond the EOF and another block
 					int i = 0;
 					for(int aux : posBlockToPad){
@@ -231,71 +239,81 @@ public class FSLib {
 				}
 				firstLastOriginalBlocks = new Pair<byte[],byte[]>(firstBlock,newContents.lastElement());
 			}
-			
+
 			//ids has all the blocks needed for the writing operations
-			
+
 			Vector<byte[]> finalModifiedBlocks = BlockManager.newBlocks(firstLastOriginalBlocks, pos, contents, posModifiedBlocks.length);
-			
+
 			//insert the new blocks into the header
 			int index = posModifiedBlocks[0];
 			for(byte[] finalForm : finalModifiedBlocks){
-				ids.set(index, _stub.put_h(finalForm));
+				String id = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(finalForm));
+				if(!id.equals(_stub.put_h(finalForm))) throw new WrongStorageException();
+				ids.set(index, id);
 				index++;		
 			}
 
-			_stub.put_k(ids, CCLogic.Sign(serialize(ids)), cert.getPublicKey());
-			
-		} catch (IOException e) {
+			_stub.put_k(ids, CCLogic.sign(serialize(ids)), cert.getPublicKey());
+
+		} catch (IOException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchMethodException | SecurityException | ClassNotFoundException | PKCS11Exception | NoSuchAlgorithmException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 
 	}
 
-	public static int FS_read(String id, int pos, int size, Buffer buffer ) throws InvalidKeyException, InvalidSignatureException, InvalidContentException{
+	public static int FS_read(PublicKey pk, int pos, int size, Buffer buffer ) throws InvalidKeyException, InvalidSignatureException, InvalidContentException{
+		String id = null;
+		//Generate ID = hash of public  key
+		try {
+			id = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(pk.toString().getBytes()));
+		} catch (NoSuchAlgorithmException e1) {
+			e1.printStackTrace();
+		}
+
 		//get header from server
 		Header header = getHeader(id);
-		
+
 		int currentBlockBeingRead = BlockManager.getBlockByPos(pos);
-		
+
 		if(currentBlockBeingRead > header.ids.size() - 1){
 			System.out.println("Initial Pos exceeds EOF!");
 			return 0;
 		}
-		
+
 		if(currentBlockBeingRead == header.ids.size() -1 && pos%BlockManager.BLOCK_SIZE > header.ids.lastElement().length()){
 			System.out.println("Initial Pos exceeds EOF!");
 			return 0;
 		}
-		
-		
-		
+
+
+
 		int bytesRead = 0 ;
-		
+
 		int totalFileSize = BlockManager.getFileSize(header, getContentBlock(header.ids.lastElement()).content);
 		int bytesToBeRead = Math.min(totalFileSize - pos , size);
 		int lastBlockToRead = BlockManager.getBlockByPos(pos + bytesToBeRead - 1);
 		byte[] readBytes = new byte[bytesToBeRead];
-		
+
 		//Read Routines
 		byte[] curBlock =  getContentBlock(header.ids.get(currentBlockBeingRead)).content;
 		int bytesToReadInFirstBlock = Math.min( curBlock.length - (pos % BlockManager.BLOCK_SIZE), size);
 		System.arraycopy(curBlock, pos % BlockManager.BLOCK_SIZE, readBytes, bytesRead, bytesToReadInFirstBlock);
 		bytesRead += bytesToReadInFirstBlock;
 		currentBlockBeingRead++;
-		
+
 		for(; currentBlockBeingRead < lastBlockToRead ; currentBlockBeingRead++){
 			curBlock = getContentBlock(header.ids.get(currentBlockBeingRead)).content;
 			System.arraycopy(curBlock, 0, readBytes, bytesRead, BlockManager.BLOCK_SIZE);
 			bytesRead += BlockManager.BLOCK_SIZE;
 		}
-		
+
 		if(currentBlockBeingRead == lastBlockToRead){
 			curBlock = getContentBlock(header.ids.get(currentBlockBeingRead)).content;
 			System.arraycopy(curBlock, 0, readBytes, bytesRead, bytesToBeRead - bytesRead);
 			bytesRead += bytesToBeRead - bytesRead;
 		}
-		
+
 		buffer.setContent(readBytes);			
 		return bytesRead;
 
@@ -304,7 +322,7 @@ public class FSLib {
 	//method for retrieving an header from the server that performs integrity checks
 	public static Header getHeader(String id) throws InvalidKeyException, InvalidSignatureException{
 		Header header = null;
-		
+
 		try {
 			header = (Header) deserialize(_stub.get(id));
 		} catch (ClassNotFoundException | IOException e) {
@@ -323,32 +341,32 @@ public class FSLib {
 		if(!VerifySignature(header.ids, header.pubKey, header.signature)){
 			throw new InvalidSignatureException();
 		}
-		
+
 		return header;
 	}
-	
+
 	public static ContentBlock getContentBlock(String id) throws InvalidContentException{
 		ContentBlock block = null;
-	
-			try {
-				block = (ContentBlock) deserialize(_stub.get(id));
-			} catch (ClassNotFoundException | IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}	
-			
+
+		try {
+			block = (ContentBlock) deserialize(_stub.get(id));
+		} catch (ClassNotFoundException | IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}	
+
 		/********** integrity checks **************/
 
 		//verify received block: the hash of the received block should match the id used to access it	
 		if(!VerifyContentBLock(block, id)){
 			throw new InvalidContentException();
 		}
-		
+
 		return block;
 	}
 
 	//TODO parse input better (the content saved in buffer does not allow for spaces)
-	public static void manageInput(String choice) throws InvalidKeyException, NumberFormatException, InvalidSignatureException, InvalidContentException {
+	public static void manageInput(String choice) throws InvalidKeyException, NumberFormatException, InvalidSignatureException, InvalidContentException, WrongStorageException {
 		String[] splited = choice.split(" "); 
 		switch(splited[0]){
 		case "init":
@@ -356,7 +374,18 @@ public class FSLib {
 			break;
 		case "read":
 			Buffer newBuffer = new Buffer();
-			int bytesRead  = FSLib.FS_read(splited[1],Integer.parseInt(splited[2]),Integer.parseInt(splited[3]),newBuffer);
+			String id = splited[1] + " " + splited[2] + " " + splited[3];
+			PublicKey pk = null;
+			try {
+				for(Pair<String, Certificate> p : _stub.readPubKeys()){
+					if(id.equals(p.getKey())) pk = p.getValue().getPublicKey();
+				}
+			} catch (RemoteException e2) {
+				// TODO Auto-generated catch block
+				e2.printStackTrace();
+			}
+
+			int bytesRead  = FSLib.FS_read(pk,Integer.parseInt(splited[4]),Integer.parseInt(splited[5]),newBuffer);
 			if(bytesRead != 0){
 				System.out.println(new String (newBuffer.getContent()));
 				System.out.println("Bytes Read : " + bytesRead);
@@ -370,33 +399,10 @@ public class FSLib {
 		case "dread":
 			FSLib.debugRead();
 			break;
-		case "storepk":			
-			CertAndKeyGen certGen;
-			try {
-				// generate the certificate
-				// first parameter  = Algorithm
-				// second parameter = signrature algorithm
-				// third parameter  = the provider to use to generate the keys (may be null or
-				//				                    use the constructor without provider)
-				certGen = new CertAndKeyGen("RSA", "SHA256WithRSA", null);
-				// generate it with 2048 bits
-				certGen.generate(2048);
-				// prepare the validity of the certificate
-				long validSecs = (long) 365 * 24 * 60 * 60; // valid for one year
-				// add the certificate information, currently only valid for one year.
-				X509Certificate cert = certGen.getSelfCertificate(
-				   // enter your details according to your application
-				   new X500Name("CN=My Application,O=My Organisation,L=My City,C=DE"), validSecs);
-				_stub.storePubKey(cert, splited[1]);
-			} catch (NoSuchAlgorithmException | NoSuchProviderException | java.security.InvalidKeyException | CertificateException | SignatureException | IOException e1) {
-				// TODO Auto-generated catch block
-				e1.printStackTrace();
-			}
-			break;
-		case "readpk":
+		case "list":
 			try {
 				for(Pair<String, Certificate> p : _stub.readPubKeys()){
-					System.out.println("user |" + p.getKey() + "| has certificate: " + p.getValue().toString());
+					System.out.println("user: " + p.getKey());
 				}
 			} catch (RemoteException e) {
 				// TODO Auto-generated catch block
@@ -433,20 +439,20 @@ public class FSLib {
 
 		return outputObject;
 	}
-	
+
 	public static void debugRead() throws InvalidKeyException, InvalidSignatureException, InvalidContentException{
-		
+
 		//get header from server
 		Header header = getHeader(ownedFileId);
-		
+
 		int count = 0;
 		for(String blockId : header.ids){
 			ContentBlock block = getContentBlock(blockId);
 			System.out.println("block " + count++ + ":\n" + new String(block.content));
 		}
-		
+
 	}
-	
+
 
 	public static void changeIdVector(int pos, String fakeId, String headerToChange){
 		try {
@@ -477,9 +483,9 @@ public class FSLib {
 
 	public static void changeContentBlock(byte[] fakeContent, String contentBlockToChange){
 		try {
-			
-			
-			
+
+
+
 			_stub.changeContentBlock(fakeContent, contentBlockToChange);
 		} catch (RemoteException e) {
 			// TODO Auto-generated catch block
