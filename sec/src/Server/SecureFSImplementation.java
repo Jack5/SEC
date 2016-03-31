@@ -13,6 +13,7 @@ import java.rmi.server.UnicastRemoteObject;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.KeyStore;
+import java.security.KeyStore.Entry;
 import java.security.KeyStoreException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -39,6 +40,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Vector;
 
+import Exceptions.InvalidSignatureException;
 import javafx.util.Pair;
 
 public class SecureFSImplementation extends UnicastRemoteObject implements SecureFSInterface {
@@ -64,7 +66,21 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 	public  Vector<String> getCBIdsFromHeader(String headerId)throws RemoteException{
 		return headerBlocks.get(headerId).ids;
 	}
-
+	@Override
+	public  void cleanCerts()throws RemoteException{
+		Enumeration<String> aliases;
+		try {
+			aliases = keyStore.aliases();
+			while(aliases.hasMoreElements()){
+				String alias = aliases.nextElement();
+				keyStore.deleteEntry(alias);
+			}
+		} catch (KeyStoreException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
 
 	////////////////////////
 
@@ -153,7 +169,7 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 	}
 
 	@Override
-	public String put_k(Vector<String> data, byte[] signed, PublicKey pubKey) throws RemoteException {
+	public String put_k(Vector<String> data, byte[] signed, PublicKey pubKey) throws RemoteException, InvalidSignatureException {
 
 		String id ;
 
@@ -175,7 +191,7 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 			sigVerify.update(serialize(data));
 			boolean result = sigVerify.verify(signed);
 			if(!result){
-				throw new RemoteException("Signature Failed - the sent signed and the data do not match!");
+				throw new InvalidSignatureException();
 			}
 		} catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e1) {
 			// TODO Auto-generated catch block

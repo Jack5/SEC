@@ -33,23 +33,6 @@ public class CCLogic {
 		return pteid.GetID().cardNumber;
 	}
 
-	public static ArrayList<X509Certificate> getAllCerts(){
-		ArrayList<X509Certificate> certs = new ArrayList<X509Certificate>();
-		try {
-			for (PTEID_Certif cert : pteid.GetCertificates()) {
-
-				certs.add(getCertFromByteArray(cert.certif));
-
-			}
-		} catch (PteidException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (CertificateException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		return certs;
-	}
 
 	public static byte[] sign(byte[] data ) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException, ClassNotFoundException, PKCS11Exception{
 
@@ -121,16 +104,6 @@ public class CCLogic {
 		pteid.SetSODChecking(false); // Don't check the integrity of the ID, address and photo (!)
 		System.out.println(" //Loaded");
 
-		/*
-	    for (PTEID_Certif cert : pteid.GetCertificates()) {
-            try {
-				System.out.println(getCertFromByteArray(cert.certif));
-			} catch (CertificateException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-        }*/
-
 	}
 
 
@@ -147,13 +120,6 @@ public class CCLogic {
 		byte[] certificate_bytes = null;
 		try {
 			PTEID_Certif[] certs = pteid.GetCertificates();
-			System.out.println("Number of certs found: " + certs.length);
-			int i = 0;
-			for (PTEID_Certif cert : certs) {
-				System.out.println("-------------------------------\nCertificate #"+(i++));
-				System.out.println(cert.certifLabel);
-			}
-
 			certificate_bytes = certs[n].certif; //gets the byte[] with the n-th certif
 
 			//pteid.Exit(pteid.PTEID_EXIT_LEAVE_CARD); // OBRIGATORIO Termina a eID Lib

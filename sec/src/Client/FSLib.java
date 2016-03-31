@@ -3,37 +3,38 @@ package Client;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.lang.reflect.InvocationTargetException;
+import java.math.BigInteger;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyPair;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.security.cert.CRLException;
 import java.security.cert.CertPath;
 import java.security.cert.CertPathValidator;
+import java.security.cert.CertPathValidatorException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
-import java.security.cert.PKIXCertPathValidatorResult;
 import java.security.cert.PKIXParameters;
 import java.security.cert.TrustAnchor;
 import java.security.cert.X509CRL;
+import java.security.cert.X509CRLEntry;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Vector;
-
 
 import Exceptions.InvalidContentException;
 import Exceptions.InvalidKeyException;
@@ -45,8 +46,6 @@ import Server.Header;
 import Server.SecureFSInterface;
 import javafx.util.Pair;
 import sun.security.pkcs11.wrapper.PKCS11Exception;
-import sun.security.tools.keytool.CertAndKeyGen;
-import sun.security.x509.X500Name;
 
 public class FSLib {
 
@@ -55,8 +54,10 @@ public class FSLib {
 
 	static KeyPair keyPair;
 	static String ownedFileId;
-	static X509Certificate cert;
-	static ArrayList<X509Certificate> rootCerts;
+	public static X509Certificate cert;
+	public static ArrayList<X509Certificate> rootCerts;
+	public static ArrayList<X509CRL> CRLs;
+
 
 	//methods for test purposes
 	public static PublicKey getPubKey(){
@@ -117,31 +118,40 @@ public class FSLib {
 		return result;
 	}
 
-	public static byte[] FS_init(){
-
+	public static void loadRootCAandCRL(){
 		try {
-			//connect to server
-			Registry registry = LocateRegistry.getRegistry(1099);
-			_stub = (SecureFSInterface) registry.lookup("fs.Server");
-			System.out.println("connected");
-
-			//load cc certificates
 			CertificateFactory cf = CertificateFactory.getInstance("X.509");
-			rootCerts = new ArrayList();
+			rootCerts = new ArrayList<X509Certificate>();
+			CRLs = new ArrayList<X509CRL>();
 			for(int i = 1; i < 4; i++){
 				FileInputStream in = new FileInputStream("C:\\Users\\biscoito\\SEC\\sec\\resources\\Cartao de Cidadao 00" + i + ".cer");
 				Certificate c = cf.generateCertificate(in);
 				rootCerts.add((X509Certificate) c);
+				in = new FileInputStream("C:\\Users\\biscoito\\SEC\\sec\\resources\\cc_ec_cidadao_crl00" + i + "_crl.crl");
+				X509CRL crl = (X509CRL) cf.generateCRL(in);
+				CRLs.add(crl);
+				System.out.println(crl);
 			}
-
-			//init CC
-			CCLogic.init();
-
+			
+			
+		} catch (CertificateException | CRLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	private static boolean checkCertificate(){
+		try{
+			CertificateFactory cf = CertificateFactory.getInstance("X.509");
 			ArrayList<X509Certificate> certificates = new ArrayList<X509Certificate>();
-
+	
+			//certificate for the authentication
 			certificates.add(CCLogic.getCertificate(0));
+			//sub CA for the authentication certificate
 			certificates.add(CCLogic.getCertificate(3));
-
 
 			CertPath cp = cf.generateCertPath(certificates);
 
@@ -150,8 +160,65 @@ public class FSLib {
 			PKIXParameters params = new PKIXParameters(anchors);
 			params.setRevocationEnabled(false);
 			CertPathValidator cpv = CertPathValidator.getInstance("PKIX");
-			PKIXCertPathValidatorResult result = (PKIXCertPathValidatorResult) cpv.validate(cp, params);
+			cpv.validate(cp, params);
+			System.out.println("Valid certificate.");
+			BigInteger serialNum = CCLogic.getCertificate(0).getSerialNumber();
+			for(X509CRL crl : CRLs){
+				for(X509CRLEntry entry : crl.getRevokedCertificates()){
+					if(serialNum == entry.getSerialNumber()) return false;
+				}
+			}
+			System.out.println("Not revoked by CRL");
+			
+			return true;
+		}catch(CertificateException | CertPathValidatorException | InvalidAlgorithmParameterException | NoSuchAlgorithmException e){
+			System.out.println("Certificate is not valid");
+			return false;
+		}
+	}
+	
+	public static boolean checkCertificate(X509Certificate cert){
+		try{
+			CertificateFactory cf = CertificateFactory.getInstance("X.509");
+			ArrayList<X509Certificate> certificates = new ArrayList<X509Certificate>();
+	
+			//certificate to check
+			certificates.add(cert);
 
+			CertPath cp = cf.generateCertPath(certificates);
+
+			HashSet<TrustAnchor> anchors = new HashSet<TrustAnchor>();
+			for(X509Certificate c : rootCerts) anchors.add(new TrustAnchor(c, null));
+			PKIXParameters params = new PKIXParameters(anchors);
+			params.setRevocationEnabled(false);
+			CertPathValidator cpv = CertPathValidator.getInstance("PKIX");
+			cpv.validate(cp, params);			
+			return true;
+		}catch(CertificateException | CertPathValidatorException | InvalidAlgorithmParameterException | NoSuchAlgorithmException e){
+			System.out.println("Certificate is not valid");
+			return false;
+		}
+	}
+
+	public static void FS_init(){
+
+		try {
+			//connect to server
+			Registry registry = LocateRegistry.getRegistry(1099);
+			_stub = (SecureFSInterface) registry.lookup("fs.Server");
+			System.out.println("connected");
+
+			//load cc certificates and crls
+			loadRootCAandCRL();
+
+			//init CC
+			CCLogic.init();
+
+			//check certificate with trusted CAs and CRLs
+			if(!checkCertificate()){
+				return;
+			};
+			
 			//get certificate from CC
 			cert = CCLogic.getCertificate(0);
 			String cardNumber = CCLogic.getCardNumber();
@@ -169,7 +236,7 @@ public class FSLib {
 			System.err.println("Client exception: " + e.toString());
 			e.printStackTrace();
 		}  
-		return null;
+		return;
 
 	}
 
@@ -318,6 +385,10 @@ public class FSLib {
 		return bytesRead;
 
 	}
+	
+	public static Vector<Pair<String, Certificate>> FS_list() throws RemoteException{
+		return _stub.readPubKeys();
+	}
 
 	//method for retrieving an header from the server that performs integrity checks
 	public static Header getHeader(String id) throws InvalidKeyException, InvalidSignatureException{
@@ -377,7 +448,7 @@ public class FSLib {
 			String id = splited[1] + " " + splited[2] + " " + splited[3];
 			PublicKey pk = null;
 			try {
-				for(Pair<String, Certificate> p : _stub.readPubKeys()){
+				for(Pair<String, Certificate> p : FS_list()){
 					if(id.equals(p.getKey())) pk = p.getValue().getPublicKey();
 				}
 			} catch (RemoteException e2) {
@@ -401,7 +472,7 @@ public class FSLib {
 			break;
 		case "list":
 			try {
-				for(Pair<String, Certificate> p : _stub.readPubKeys()){
+				for(Pair<String, Certificate> p : FS_list()){
 					System.out.println("user: " + p.getKey());
 				}
 			} catch (RemoteException e) {
@@ -417,6 +488,10 @@ public class FSLib {
 			System.out.println("write pos size contents");
 			break;
 		}
+	}
+	
+	public static void addDummyCert(Certificate cert, String userName) throws RemoteException{
+		_stub.storePubKey(cert, userName);
 	}
 
 	public static byte[] serialize(Object obj) throws IOException {
@@ -483,9 +558,6 @@ public class FSLib {
 
 	public static void changeContentBlock(byte[] fakeContent, String contentBlockToChange){
 		try {
-
-
-
 			_stub.changeContentBlock(fakeContent, contentBlockToChange);
 		} catch (RemoteException e) {
 			// TODO Auto-generated catch block
@@ -501,6 +573,15 @@ public class FSLib {
 			e.printStackTrace();
 		}
 		return null;
+	}
+	
+	public static void cleanseCerts(){
+		try {
+			_stub.cleanCerts();
+		} catch (RemoteException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 }
