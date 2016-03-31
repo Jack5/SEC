@@ -1,36 +1,32 @@
 Group 8
 Pedro Mendonça 73896, Ivo Pinto 73888, Tiago Pereira 76352
 
+This README covers the new tests implemented in the second part of the project only.
+
 Functionality tests:
 
-The functionality tests are divided in 3 test classes in junit.
+The functionality tests are divided in 5 test classes in junit.
 
-testFSINIT: 
-	tests the correctness of the FS_init function
+testsFSINIT: 
+	tests the correctness of the FS_init function (now checks that the certificate present in the CC is stored correctly)
 
-testFSREAD: 
-	test the correctness of the FS_read function, by performing 3 tests:
-		reading from a valid position with a size that does not surpasses EOF
-		reading from a valid position with a size that surpasses EOF
-		reading from a position that surpasses the EOF
+testsFSLIST:
+	tests the correctness of the FS_list() function. it consist of 2 tests:
+		check that list works with one CC registered in the server
+		check that list works with more than one CC registered in the server (since we only have one functonal CC we use dummy certificates)
 
-testWRITE: 
-	test the correctness of the FS_write function, by performing 12 tests. These tests aim to ensure that all corner cases are correct.
-	The first 6 tests try writing on an empty file, with combinations of:
-		starting in the first position or not
-		writing content that would fit in one content block or that would need more than one
-	The last 6 writing over an existing file, testing particulars such as:
-		overwriting data
-		writing after EOF
-		writing over various content blocks
+testsFSWRITE: 
+	test the correctness of the FS_write function. it requires the use of a correct CC with its correct PIN code
+
+testsFSREAD: 
+	test the correctness of the FS_read function (it now identifies which file to read using its public key)
+
+testsCertificates:
+	tests that only certificates which are validated by the CAs of Cartao de Cidadao are usable
 
 ///////////////////////////////////////////////
 
 Integrity tests:
 
-To test the integrity of the project the server has a set of functions that alter the contents of either the Header Blocks or the Content Block.
-
-For the Header Blocks we test that the client detects when either the Contents Blocks which the header is composed of, the signature or the public key were tampered.
-For the Content Blocks we test that when the content of a Content Block is altered the client detects it.
-
-These tests are in the class testIntegrity.
+To test the aditional integrity provided by our solution we use the class testsIntegrity which performs the following test:
+	perform the init function with one CC, switch the CC with another one and attempt to write something to the file, which is not possible.
