@@ -22,8 +22,8 @@ import sun.security.pkcs11.wrapper.PKCS11Exception;
 
 
 public class CCLogic {
-
-	private static boolean isLogin = false;
+	
+	static boolean isLogin = false;
 	
 	public static X509Certificate getCertificate(int n) throws CertificateException{
 		return getCertFromByteArray(getCertificateInBytes(n));
@@ -34,8 +34,8 @@ public class CCLogic {
 	}
 
 
-	public static byte[] sign(byte[] data ) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException, ClassNotFoundException, PKCS11Exception{
-
+	public static byte[] sign(byte[] data ) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException, ClassNotFoundException, PKCS11Exception, PteidException{	
+		
 		java.util.Base64.Encoder encoder = java.util.Base64.getEncoder();
 		PKCS11 pkcs11;
 		String osName = System.getProperty("os.name");
@@ -65,9 +65,7 @@ public class CCLogic {
 			pkcs11.C_Login(p11_session, 1, null);
 			isLogin = true;
 		}
-		
-		
-		
+
 		CK_SESSION_INFO info = pkcs11.C_GetSessionInfo(p11_session);
 
 		// Get available keys
@@ -91,7 +89,9 @@ public class CCLogic {
 
 
 		// sign
-		return pkcs11.C_Sign(p11_session, data);  
+		byte[] result = pkcs11.C_Sign(p11_session, data); 
+		pteid.Exit(pteid.PTEID_EXIT_LEAVE_CARD);
+		return  result;
 
 	}
 
@@ -103,7 +103,7 @@ public class CCLogic {
 		pteid.Init(""); // Initializes the eID Lib
 		pteid.SetSODChecking(false); // Don't check the integrity of the ID, address and photo (!)
 		System.out.println(" //Loaded");
-
+		
 	}
 
 
@@ -112,7 +112,6 @@ public class CCLogic {
 		CertificateFactory f = CertificateFactory.getInstance("X.509");
 		InputStream in = new ByteArrayInputStream(certificateEncoded);
 		X509Certificate cert = (X509Certificate)f.generateCertificate(in);
-
 		return cert;
 	}
 	// Returns the n-th certificate, starting from 0
@@ -121,15 +120,10 @@ public class CCLogic {
 		try {
 			PTEID_Certif[] certs = pteid.GetCertificates();
 			certificate_bytes = certs[n].certif; //gets the byte[] with the n-th certif
-
-			//pteid.Exit(pteid.PTEID_EXIT_LEAVE_CARD); // OBRIGATORIO Termina a eID Lib
+	
 		} catch (PteidException e) {
 			e.printStackTrace();
 		}
 		return certificate_bytes;
 	}
-
-
-
-
 }

@@ -2,7 +2,6 @@ package Server;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -10,34 +9,20 @@ import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
-import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.KeyStore;
-import java.security.KeyStore.Entry;
 import java.security.KeyStoreException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
-import java.security.cert.CertPath;
-import java.security.cert.CertPathValidator;
-import java.security.cert.CertPathValidatorException;
 import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
-import java.security.cert.PKIXCertPathValidatorResult;
-import java.security.cert.PKIXParameters;
-import java.security.cert.TrustAnchor;
-import java.security.cert.X509Certificate;
-import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.Vector;
 
 import Exceptions.InvalidSignatureException;
@@ -96,7 +81,7 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 	public SecureFSImplementation() throws RemoteException {}
 
 	public static void main(String args[]) {
-
+		
 		try {
 			LocateRegistry.createRegistry(1099);
 			SecureFSImplementation server = new SecureFSImplementation();
@@ -169,8 +154,8 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 	}
 
 	@Override
-	public String put_k(Vector<String> data, byte[] signed, PublicKey pubKey) throws RemoteException, InvalidSignatureException {
-
+	public String put_k(Vector<String> data, byte[] signed, PublicKey pubKey, Date d) throws RemoteException, InvalidSignatureException {
+ 
 		String id ;
 
 		//Generate ID = hash of public  key
@@ -200,6 +185,13 @@ public class SecureFSImplementation extends UnicastRemoteObject implements Secur
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		
+		Date date = new Date(System.currentTimeMillis());
+		long dif = date.getTime() - d.getTime();
+		System.out.println("Current time: " + date.getTime() +"\nMessage time: " + d.getTime() + "\nDiference: " + dif);
+		if(dif > 2000){
+			return null;
+		} 
 
 		Header newHeader = new Header(pubKey, signed, data);
 		headerBlocks.put(id, newHeader);

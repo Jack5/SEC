@@ -33,6 +33,7 @@ import java.security.cert.X509CRLEntry;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Vector;
 
@@ -45,6 +46,7 @@ import Server.ContentBlock;
 import Server.Header;
 import Server.SecureFSInterface;
 import javafx.util.Pair;
+import pteidlib.PteidException;
 import sun.security.pkcs11.wrapper.PKCS11Exception;
 
 public class FSLib {
@@ -203,8 +205,9 @@ public class FSLib {
 	public static void FS_init(){
 
 		try {
-			//connect to server
-			Registry registry = LocateRegistry.getRegistry(1099);
+			 // Make reference to SSL-based registry
+            Registry registry = LocateRegistry.getRegistry(1099);
+
 			_stub = (SecureFSInterface) registry.lookup("fs.Server");
 			System.out.println("connected");
 
@@ -227,9 +230,11 @@ public class FSLib {
 
 			//empty vector of ids for an uninitialized file
 			Vector<String> emptyIds = new Vector<String>();
+			byte[] signature = CCLogic.sign(serialize(emptyIds));
+			Date date = new Date(System.currentTimeMillis());
 
 			//server call
-			ownedFileId =_stub.put_k(emptyIds, CCLogic.sign(serialize(emptyIds)), cert.getPublicKey());
+			ownedFileId =_stub.put_k(emptyIds, signature, cert.getPublicKey(), date);
 
 			BlockManager.hashEmptyBlock(_stub);
 		} catch (Exception e) {
@@ -320,9 +325,15 @@ public class FSLib {
 				index++;		
 			}
 
-			_stub.put_k(ids, CCLogic.sign(serialize(ids)), cert.getPublicKey());
+			byte[] signature = CCLogic.sign(serialize(ids));
+			Date date = new Date(System.currentTimeMillis());
+
+			_stub.put_k(ids, signature, cert.getPublicKey(), date);
 
 		} catch (IOException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchMethodException | SecurityException | ClassNotFoundException | PKCS11Exception | NoSuchAlgorithmException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (PteidException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}

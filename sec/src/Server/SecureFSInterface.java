@@ -4,6 +4,7 @@ import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.security.PublicKey;
 import java.security.cert.Certificate;
+import java.util.Date;
 import java.util.Vector;
 
 import Exceptions.InvalidSignatureException;
@@ -12,7 +13,7 @@ import javafx.util.Pair;
 public interface SecureFSInterface extends Remote {
     
 	public byte[] get(String id) throws RemoteException;
-	public String put_k(Vector<String> data, byte[] signed, PublicKey pubKey) throws RemoteException, InvalidSignatureException;
+	public String put_k(Vector<String> data, byte[] signed, PublicKey pubKey, Date d) throws RemoteException, InvalidSignatureException;
 	public String put_h(byte[] data) throws RemoteException;
 	public Vector<Pair<String, Certificate>> readPubKeys() throws RemoteException;
 	public boolean storePubKey(Certificate cert, String userName) throws RemoteException;
